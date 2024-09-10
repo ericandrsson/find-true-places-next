@@ -32,7 +32,7 @@ import { haversineDistance } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Trash2, Edit, ChevronRight, ChevronLeft, List } from "lucide-react";
+import { Trash2, Edit, ChevronRight, ChevronLeft, List, ChevronDown, ChevronUp } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import "react-leaflet-cluster/lib/assets/MarkerCluster.css";
@@ -320,6 +320,7 @@ export default function Map({ initialCenter }: MapProps) {
   const [mapZoom, setMapZoom] = useState(13);
   const mapRef = useRef<L.Map | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showAllTags, setShowAllTags] = useState(false);
 
   useEffect(() => {
     const lat = searchParams.get("lat");
@@ -488,35 +489,57 @@ export default function Map({ initialCenter }: MapProps) {
   };
 
   const renderTagSelection = () => {
+    const visibleTags = showAllTags ? mockTags : mockTags.slice(0, 5);
+
     return (
-      <Command className="border rounded-lg">
-        <CommandInput placeholder="Search tags..." />
-        <CommandList>
-          <CommandEmpty>No tags found.</CommandEmpty>
-          <CommandGroup heading="Available Tags">
-            {mockTags.map((tag) => (
-              <CommandItem
-                key={tag.id}
-                onSelect={() => {
-                  setSelectedTags((prev) =>
-                    prev.includes(tag.id)
-                      ? prev.filter((id) => id !== tag.id)
-                      : [...prev, tag.id]
-                  );
-                }}
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    selectedTags.includes(tag.id) ? "opacity-100" : "opacity-0"
-                  )}
-                />
-                {tag.name}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </Command>
+      <div className="space-y-2">
+        <Command className="border rounded-lg">
+          <CommandInput placeholder="Search tags..." />
+          <CommandList className="max-h-40 overflow-y-auto">
+            <CommandEmpty>No tags found.</CommandEmpty>
+            <CommandGroup heading="Available Tags">
+              {visibleTags.map((tag) => (
+                <CommandItem
+                  key={tag.id}
+                  onSelect={() => {
+                    setSelectedTags((prev) =>
+                      prev.includes(tag.id)
+                        ? prev.filter((id) => id !== tag.id)
+                        : [...prev, tag.id]
+                    );
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedTags.includes(tag.id) ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {tag.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+        {mockTags.length > 5 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-sm"
+            onClick={() => setShowAllTags(!showAllTags)}
+          >
+            {showAllTags ? (
+              <>
+                Show Less <ChevronUp className="ml-2 h-4 w-4" />
+              </>
+            ) : (
+              <>
+                Show More <ChevronDown className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        )}
+      </div>
     );
   };
 
