@@ -321,6 +321,7 @@ export default function Map({ initialCenter }: MapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showAllTags, setShowAllTags] = useState(false);
+  const [modalPosition, setModalPosition] = useState<'top' | 'bottom'>('bottom');
 
   useEffect(() => {
     const lat = searchParams.get("lat");
@@ -489,55 +490,74 @@ export default function Map({ initialCenter }: MapProps) {
   };
 
   const renderTagSelection = () => {
-    const visibleTags = showAllTags ? mockTags : mockTags.slice(0, 5);
+    const visibleTags = showAllTags ? mockTags : mockTags.slice(0, 2);
 
     return (
       <div className="space-y-2">
-        <Command className="border rounded-lg">
-          <CommandInput placeholder="Search tags..." />
-          <CommandList className="max-h-40 overflow-y-auto">
-            <CommandEmpty>No tags found.</CommandEmpty>
-            <CommandGroup heading="Available Tags">
-              {visibleTags.map((tag) => (
-                <CommandItem
-                  key={tag.id}
-                  onSelect={() => {
-                    setSelectedTags((prev) =>
-                      prev.includes(tag.id)
-                        ? prev.filter((id) => id !== tag.id)
-                        : [...prev, tag.id]
-                    );
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedTags.includes(tag.id) ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {tag.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-        {mockTags.length > 5 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-sm"
-            onClick={() => setShowAllTags(!showAllTags)}
-          >
-            {showAllTags ? (
-              <>
-                Show Less <ChevronUp className="ml-2 h-4 w-4" />
-              </>
-            ) : (
-              <>
-                Show More <ChevronDown className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          {visibleTags.map((tag) => (
+            <Button
+              key={tag.id}
+              variant={selectedTags.includes(tag.id) ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setSelectedTags((prev) =>
+                  prev.includes(tag.id)
+                    ? prev.filter((id) => id !== tag.id)
+                    : [...prev, tag.id]
+                );
+              }}
+            >
+              {tag.name}
+            </Button>
+          ))}
+          {mockTags.length > 2 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAllTags(!showAllTags)}
+            >
+              {showAllTags ? (
+                <>
+                  Show Less <ChevronUp className="ml-1 h-3 w-3" />
+                </>
+              ) : (
+                <>
+                  More Tags <ChevronDown className="ml-1 h-3 w-3" />
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+        {showAllTags && (
+          <Command className="border rounded-lg mt-2">
+            <CommandInput placeholder="Search tags..." />
+            <CommandList className="max-h-32 overflow-y-auto">
+              <CommandEmpty>No tags found.</CommandEmpty>
+              <CommandGroup>
+                {mockTags.map((tag) => (
+                  <CommandItem
+                    key={tag.id}
+                    onSelect={() => {
+                      setSelectedTags((prev) =>
+                        prev.includes(tag.id)
+                          ? prev.filter((id) => id !== tag.id)
+                          : [...prev, tag.id]
+                      );
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedTags.includes(tag.id) ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {tag.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
         )}
       </div>
     );
@@ -552,6 +572,16 @@ export default function Map({ initialCenter }: MapProps) {
     (e: L.LeafletMouseEvent) => {
       if (mode === "pin") {
         setTagPosition([e.latlng.lat, e.latlng.lng]);
+        const clickY = e.originalEvent.clientY;
+        const windowHeight = window.innerHeight;
+        const modalHeight = 400; // Approximate height of the modal, adjust as needed
+
+        if (clickY < modalHeight) {
+          setModalPosition('bottom');
+        } else {
+          setModalPosition('top');
+        }
+
         setClickPosition({
           x: e.originalEvent.clientX,
           y: e.originalEvent.clientY,
@@ -842,15 +872,16 @@ export default function Map({ initialCenter }: MapProps) {
       {showTagForm && clickPosition && (
         <div
           className={cn(
-            "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-96", // Increased width
-            "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2",
-            "before:border-8 before:border-transparent before:border-t-white",
+            "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-96",
+            modalPosition === 'bottom'
+              ? "before:content-[''] before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:border-8 before:border-transparent before:border-b-white"
+              : "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-8 before:border-transparent before:border-t-white",
             showListView ? "mr-80" : ""
           )}
           style={{
             left: `${clickPosition.x}px`,
-            top: `${clickPosition.y - 75}px`,
-            transform: "translate(-50%, -100%)",
+            [modalPosition === 'bottom' ? 'top' : 'bottom']: `${modalPosition === 'bottom' ? clickPosition.y + 10 : window.innerHeight - clickPosition.y + 10}px`,
+            transform: 'translateX(-50%)',
           }}
         >
           <form onSubmit={handleSpotSubmit} className="space-y-4">
