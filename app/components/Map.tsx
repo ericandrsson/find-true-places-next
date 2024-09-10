@@ -388,7 +388,7 @@ export default function Map({ initialCenter }: MapProps) {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const records = await pb.collection("categories").getFullList({
+        const records = await pb.collection("spot_categories").getFullList({
           sort: "name",
         });
         setCategories(
