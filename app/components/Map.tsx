@@ -37,6 +37,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import "react-leaflet-cluster/lib/assets/MarkerCluster.css";
 import "react-leaflet-cluster/lib/assets/MarkerCluster.Default.css";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { Check } from "lucide-react"
 
 const MIN_ZOOM = 6; // 1 is most zoomed in (street level)
 const MAX_ZOOM = 18; // 10 is most zoomed out (world level)
@@ -72,6 +81,24 @@ interface DynamicMarkersProps {
   user: { id: string } | null;
   isAdmin: boolean;
 }
+
+interface Tag {
+  id: string;
+  name: string;
+}
+
+const mockTags: Tag[] = [
+  { id: "1", name: "Scenic" },
+  { id: "2", name: "Historical" },
+  { id: "3", name: "Food" },
+  { id: "4", name: "Adventure" },
+  { id: "5", name: "Relaxation" },
+  { id: "6", name: "Family-friendly" },
+  { id: "7", name: "Hidden Gem" },
+  { id: "8", name: "Nightlife" },
+  { id: "9", name: "Cultural" },
+  { id: "10", name: "Nature" },
+];
 
 function SetViewOnClick({ center }: { center: { lat: number; lng: number } }) {
   const map = useMap();
@@ -292,6 +319,7 @@ export default function Map({ initialCenter }: MapProps) {
   const searchParams = useSearchParams();
   const [mapZoom, setMapZoom] = useState(13);
   const mapRef = useRef<L.Map | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   useEffect(() => {
     const lat = searchParams.get("lat");
@@ -455,26 +483,40 @@ export default function Map({ initialCenter }: MapProps) {
             </SelectContent>
           </Select>
         )}
-
-        {selectedCategory[1] && getChildCategories(selectedCategory[1]).length > 0 && (
-          <Select
-            onValueChange={(value) => handleCategorySelect(value, 2)}
-            value={selectedCategory[2] || ""}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select sub-sub-category" />
-            </SelectTrigger>
-            <SelectContent>
-              {getChildCategories(selectedCategory[1]).map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  <span className="mr-2">{category.icon}</span>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
+    );
+  };
+
+  const renderTagSelection = () => {
+    return (
+      <Command className="border rounded-lg">
+        <CommandInput placeholder="Search tags..." />
+        <CommandList>
+          <CommandEmpty>No tags found.</CommandEmpty>
+          <CommandGroup heading="Available Tags">
+            {mockTags.map((tag) => (
+              <CommandItem
+                key={tag.id}
+                onSelect={() => {
+                  setSelectedTags((prev) =>
+                    prev.includes(tag.id)
+                      ? prev.filter((id) => id !== tag.id)
+                      : [...prev, tag.id]
+                  );
+                }}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    selectedTags.includes(tag.id) ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                {tag.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
     );
   };
 
@@ -510,6 +552,7 @@ export default function Map({ initialCenter }: MapProps) {
         category: selectedCategory[selectedCategory.length - 1], // Use the last selected category
         user: user?.id,
         isPublic: isPublic,
+        tags: selectedTags, // Add the selected tags
       };
 
       const createdSpot = await pb.collection("spots").create(spotData);
@@ -518,6 +561,7 @@ export default function Map({ initialCenter }: MapProps) {
       setSpotTitle("");
       setSpotDescription("");
       setSelectedCategory([]);
+      setSelectedTags([]);
       setIsPublic(true);
     } catch (error) {
       console.error("Error creating spot:", error);
@@ -775,7 +819,7 @@ export default function Map({ initialCenter }: MapProps) {
       {showTagForm && clickPosition && (
         <div
           className={cn(
-            "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-80",
+            "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-96", // Increased width
             "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2",
             "before:border-8 before:border-transparent before:border-t-white",
             showListView ? "mr-80" : ""
@@ -805,6 +849,11 @@ export default function Map({ initialCenter }: MapProps) {
               <Label>Category</Label>
               {renderCategorySelection()}
             </div>
+            {/* Tag Selection */}
+            <div className="space-y-2">
+              <Label>Tags</Label>
+              {renderTagSelection()}
+            </div>
             <div className="flex items-center space-x-2">
               <Switch
                 id="public-switch"
@@ -824,6 +873,7 @@ export default function Map({ initialCenter }: MapProps) {
                   setShowTagForm(false);
                   setIsPublic(true);
                   setSelectedCategory([]);
+                  setSelectedTags([]);
                 }}
               >
                 Cancel
