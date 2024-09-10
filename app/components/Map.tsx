@@ -31,7 +31,8 @@ import debounce from "lodash/debounce";
 import { formatDistanceToNow } from "date-fns";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Trash2, Edit } from "lucide-react";
+import { Trash2, Edit, ChevronRight, ChevronLeft, List } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -236,6 +237,8 @@ export default function Map({ initialCenter }: MapProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [spots, setSpots] = useState<Array<any>>([]);
   const [isPublic, setIsPublic] = useState(true);
+  const [showListView, setShowListView] = useState(false);
+  const [userSpots, setUserSpots] = useState<Array<any>>([]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -390,8 +393,30 @@ export default function Map({ initialCenter }: MapProps) {
     }
   };
 
+  useEffect(() => {
+    const fetchUserSpots = async () => {
+      if (user) {
+        try {
+          const result = await pb.collection("spots").getList(1, 50, {
+            filter: `user = "${user.id}"`,
+            sort: "-created",
+          });
+          setUserSpots(result.items);
+        } catch (error) {
+          console.error("Error fetching user spots:", error);
+        }
+      }
+    };
+
+    fetchUserSpots();
+  }, [user]);
+
+  const handleListViewToggle = () => {
+    setShowListView(!showListView);
+  };
+
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full overflow-hidden">
       <style jsx global>{`
         .spot-marker {
           display: flex;
@@ -458,6 +483,12 @@ export default function Map({ initialCenter }: MapProps) {
           background: none;
           border: none;
         }
+
+        .leaflet-container {
+          height: 100% !important;
+          width: 100% !important;
+          position: absolute !important;
+        }
       `}</style>
       <MapContainer
         className="h-full w-full z-0"
@@ -509,16 +540,73 @@ export default function Map({ initialCenter }: MapProps) {
         ) : (
           <Dialog>
             <DialogTrigger asChild>
-              <button className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200">
-                📍
-              </button>
+              <button className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"></button>
             </DialogTrigger>
             <DialogContent>
               <AuthDialog onClose={() => {}} />
             </DialogContent>
           </Dialog>
         )}
+        <button
+          onClick={handleListViewToggle}
+          className={`
+            ${
+              showListView ? "bg-blue-500 text-white" : "bg-white text-gray-700"
+            }
+            border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg
+            hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
+            transition-colors duration-200
+          `}
+        >
+          <List size={32} />
+        </button>
       </div>
+
+      {/* List View Sidebar */}
+      {showListView && (
+        <div
+          className="
+            absolute top-0 right-0 h-full w-80 bg-white shadow-lg z-20
+            transform transition-transform duration-300 ease-in-out
+          "
+        >
+          <div className="h-full flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h2 className="text-xl font-bold">Your Spots</h2>
+              <button
+                onClick={handleListViewToggle}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <ChevronRight size={24} />
+              </button>
+            </div>
+            <ScrollArea className="flex-grow">
+              <div className="p-4">
+                {userSpots.map((spot) => (
+                  <div
+                    key={spot.id}
+                    className="mb-4 p-3 bg-gray-100 rounded-lg"
+                  >
+                    <h3 className="font-semibold">{spot.name}</h3>
+                    <p className="text-sm text-gray-600">{spot.description}</p>
+                    <button
+                      onClick={() => {
+                        if (mapRef.current) {
+                          mapRef.current.setView([spot.lat, spot.lng], 15);
+                        }
+                        setShowListView(false);
+                      }}
+                      className="mt-2 text-blue-500 hover:text-blue-700 text-sm"
+                    >
+                      View on map
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      )}
 
       {showTagForm && clickPosition && (
         <div
