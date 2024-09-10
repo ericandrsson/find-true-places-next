@@ -72,8 +72,12 @@ interface Spot {
   isPublic: boolean;
   created: string;
   expand?: {
-    "spot_tags(spot_id)": Array<{
-      tag_id: string;
+    "spot_tag_links(spot)": Array<{
+      tag: {
+        id: string;
+        name: string;
+        icon: string;
+      };
     }>;
   };
 }
@@ -352,7 +356,7 @@ export default function Map({ initialCenter }: MapProps) {
         const result = await pb.collection("spots").getList<Spot>(1, 1000, {
           filter: filter,
           sort: "-created",
-          expand: "spot_tags(spot_id).tag_id",
+          expand: "spot_tag_links(spot).tag",
         });
 
         const filteredSpots = result.items.filter((spot: any) => {
@@ -645,15 +649,20 @@ export default function Map({ initialCenter }: MapProps) {
 
       const createdSpot = await pb.collection("spots").create(spotData);
 
-      // Create spot-tag relationships
+      // Create spot-tag links
       for (const tagId of selectedTags) {
-        await pb.collection("spot_tags").create({
-          spot_id: createdSpot.id,
-          tag_id: tagId,
+        await pb.collection("spot_tag_links").create({
+          spot: createdSpot.id,
+          tag: tagId,
         });
       }
 
-      setSpots((prevSpots) => [...prevSpots, createdSpot]);
+      // Fetch the created spot with expanded tags
+      const spotWithTags = await pb.collection("spots").getOne(createdSpot.id, {
+        expand: 'spot_tag_links(spot).tag',
+      });
+
+      setSpots((prevSpots) => [...prevSpots, spotWithTags]);
       setShowTagForm(false);
       setSpotTitle("");
       setSpotDescription("");
