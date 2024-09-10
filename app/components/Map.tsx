@@ -49,6 +49,7 @@ interface Category {
   id: string;
   name: string;
   icon: string;
+  parent_spot_category?: string;
 }
 
 interface Spot {
@@ -193,7 +194,7 @@ function DynamicMarkers({
       spiderfyOnMaxZoom={true}
       showCoverageOnHover={false}
       maxClusterRadius={50}
-      iconCreateFunction={(cluster) => {
+      iconCreateFunction={(cluster: L.MarkerClusterGroup) => {
         const count = cluster.getChildCount();
         return L.divIcon({
           html: `<div class="cluster-icon">${count}</div>`,
@@ -277,12 +278,12 @@ export default function Map({ initialCenter }: MapProps) {
   const [tagPosition, setTagPosition] = useState<[number, number] | null>(null);
   const [spotTitle, setSpotTitle] = useState("");
   const [spotDescription, setSpotDescription] = useState("");
-  const [spotCategory, setSpotCategory] = useState<string>("");
   const [clickPosition, setClickPosition] = useState<{
     x: number;
     y: number;
   } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string[]>([]);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [isPublic, setIsPublic] = useState(true);
   const [showListView, setShowListView] = useState(false);
@@ -388,23 +389,88 @@ export default function Map({ initialCenter }: MapProps) {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const records = await pb.collection("spot_categories").getFullList({
-          sort: "name",
-        });
-        setCategories(
-          records.map((record) => ({
-            id: record.id,
-            name: record.name,
-            icon: record.icon,
-          }))
-        );
+        const result = await pb.collection("spot_categories").getFullList<Category>();
+        setCategories(result);
       } catch (error) {
         console.error("Error fetching categories:", error);
       }
     };
-
     fetchCategories();
   }, []);
+
+  const getChildCategories = (parentId: string | null) => {
+    return categories.filter(category => category.parent_spot_category === parentId);
+  };
+
+  const handleCategorySelect = (categoryId: string, level: number) => {
+    setSelectedCategory(prev => {
+      const newSelection = [...prev.slice(0, level), categoryId];
+      return newSelection.length > 3 ? newSelection.slice(-3) : newSelection;
+    });
+  };
+
+  const renderCategorySelection = () => {
+    const rootCategories = categories.filter(category => !category.parent_spot_category);
+    
+    return (
+      <div className="space-y-4">
+        <Select 
+          onValueChange={(value) => handleCategorySelect(value, 0)}
+          value={selectedCategory[0] || ""}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select main category" />
+          </SelectTrigger>
+          <SelectContent>
+            {rootCategories.map((category) => (
+              <SelectItem key={category.id} value={category.id}>
+                <span className="mr-2">{category.icon}</span>
+                {category.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        {selectedCategory[0] && (
+          <Select 
+            onValueChange={(value) => handleCategorySelect(value, 1)}
+            value={selectedCategory[1] || ""}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select sub-category" />
+            </SelectTrigger>
+            <SelectContent>
+              {getChildCategories(selectedCategory[0]).map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  <span className="mr-2">{category.icon}</span>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        
+        {selectedCategory[1] && (
+          <Select 
+            onValueChange={(value) => handleCategorySelect(value, 2)}
+            value={selectedCategory[2] || ""}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select sub-sub-category" />
+            </SelectTrigger>
+            <SelectContent>
+              {getChildCategories(selectedCategory[1]).map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  <span className="mr-2">{category.icon}</span>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+    );
+  };
 
   const handleModeChange = (newMode: "move" | "pin") => {
     setMode(newMode);
@@ -430,30 +496,25 @@ export default function Map({ initialCenter }: MapProps) {
     if (!tagPosition) return;
 
     try {
-      const data = {
+      const spotData = {
         name: spotTitle,
         description: spotDescription,
         lat: tagPosition[0],
         lng: tagPosition[1],
-        category: spotCategory,
-        user: pb.authStore.model?.id,
+        category: selectedCategory[selectedCategory.length - 1], // Use the last selected category
+        user: user?.id,
         isPublic: isPublic,
       };
 
-      const newSpot = await pb.collection("spots").create<Spot>(data);
+      const createdSpot = await pb.collection("spots").create(spotData);
+      setSpots((prevSpots) => [...prevSpots, createdSpot]);
       setShowTagForm(false);
       setSpotTitle("");
       setSpotDescription("");
-      setSpotCategory("");
+      setSelectedCategory([]);
       setIsPublic(true);
-
-      setSpots((prevSpots) => [...prevSpots, newSpot]);
-
-      if (mapRef.current) {
-        mapRef.current.setView([newSpot.lat, newSpot.lng], 13);
-      }
     } catch (error) {
-      console.error("Failed to create spot:", error);
+      console.error("Error creating spot:", error);
     }
   };
 
@@ -512,7 +573,6 @@ export default function Map({ initialCenter }: MapProps) {
     setShowListView(!showListView);
   };
 
-  // Add this new function to handle spot click in the list view
   const handleSpotClick = useCallback((spot: Spot) => {
     if (mapRef.current) {
       mapRef.current.setView([spot.lat, spot.lng], 15);
@@ -734,28 +794,11 @@ export default function Map({ initialCenter }: MapProps) {
               onChange={(e) => setSpotDescription(e.target.value)}
               required
             />
-            <Select onValueChange={setSpotCategory} value={spotCategory}>
-              <SelectTrigger className="z-30">
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent className="z-30">
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    <span
-                      className="mr-2 text-xl"
-                      style={{
-                        display: "inline-block",
-                        width: "1.5em",
-                        textAlign: "center",
-                      }}
-                    >
-                      {category.icon}
-                    </span>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Category Selection */}
+            <div className="space-y-2">
+              <Label>Category</Label>
+              {renderCategorySelection()}
+            </div>
             <div className="flex items-center space-x-2">
               <Switch
                 id="public-switch"
@@ -774,6 +817,7 @@ export default function Map({ initialCenter }: MapProps) {
                 onClick={() => {
                   setShowTagForm(false);
                   setIsPublic(true);
+                  setSelectedCategory([]);
                 }}
               >
                 Cancel

@@ -11,7 +11,7 @@ export default function MapView() {
   const [initialCenter, setInitialCenter] = useState({
     lat: 40.7128,
     lng: -74.006,
-  }); // Default to New York City
+  });
 
   useEffect(() => {
     const lat = searchParams.get("lat");
