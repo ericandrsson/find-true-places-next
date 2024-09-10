@@ -227,7 +227,7 @@ export default function Map({ initialCenter }: MapProps) {
   const getSpotIcon = useCallback(
     (spot: any) => {
       const category = categories.find((c) => c.id === spot.category);
-      const icon = category ? category.icon : "📍"; // Default to a pin if no category is found
+      const icon = category ? category.icon : "📍";
       const timeAgo = formatDistanceToNow(new Date(spot.created), {
         addSuffix: true,
       });
@@ -243,8 +243,8 @@ export default function Map({ initialCenter }: MapProps) {
           </div>
         `,
         className: "custom-div-icon",
-        iconSize: [200, 50],
-        iconAnchor: [0, 25],
+        iconSize: [200, 80],
+        iconAnchor: [100, 80],
       });
     },
     [categories]
@@ -258,31 +258,46 @@ export default function Map({ initialCenter }: MapProps) {
       <style jsx global>{`
         .spot-marker {
           display: flex;
+          flex-direction: column;
           align-items: center;
-          border-radius: 25px;
+          transition: all 0.3s ease;
+        }
+        .spot-marker:hover {
+          transform: scale(1.05);
         }
         .spot-icon {
-          font-size: 24px;
-          margin-right: 8px;
+          font-size: 48px;
+          filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.4));
         }
         .spot-text {
           display: flex;
           flex-direction: column;
+          align-items: center;
+          margin-top: -5px;
         }
         .spot-title {
-          font-size: 14px;
-          font-weight: bold;
-          color: #333;
-          white-space: nowrap;
+          font-family: 'Nunito', sans-serif;
+          font-size: 16px;
+          font-weight: 800;
+          color: #3b82f6;
+          text-align: center;
+          max-width: 150px;
           overflow: hidden;
           text-overflow: ellipsis;
-          max-width: 150px;
+          white-space: nowrap;
+          text-shadow: 
+            2px 0 0 #fff, -2px 0 0 #fff, 0 2px 0 #fff, 0 -2px 0 #fff,
+            1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
         }
         .spot-time {
-          font-size: 10px;
-          color: #666;
-          white-space: nowrap;
-          align-self: flex-end;
+          font-family: 'Nunito', sans-serif;
+          font-size: 12px;
+          font-weight: 600;
+          color: #6b7280;
+          text-align: center;
+          text-shadow: 
+            1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff,
+            0.5px 0.5px 0 #fff, -0.5px -0.5px 0 #fff, 0.5px -0.5px 0 #fff, -0.5px 0.5px 0 #fff;
         }
       `}</style>
       <MapContainer
