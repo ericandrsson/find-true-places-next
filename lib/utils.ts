@@ -24,3 +24,7 @@ export function haversineDistance(
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in kilometers
 }
+
+export function encodeURIComponent(str: string): string {
+  return window.encodeURIComponent(str).replace(/%20/g, '+');
+}

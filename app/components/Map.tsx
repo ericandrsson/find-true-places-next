@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import L from "leaflet";
 import {
   MapContainer,
@@ -27,9 +27,17 @@ import { useAuth } from "@/app/contexts/AuthContext";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import AuthDialog from "./AuthDialog";
 import { haversineDistance } from "@/lib/utils";
+import debounce from "lodash/debounce";
+import { formatDistanceToNow } from "date-fns";
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
+}
+
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
 }
 
 function SetViewOnClick({ center }: { center: { lat: number; lng: number } }) {
@@ -96,9 +104,7 @@ export default function Map({ initialCenter }: MapProps) {
     x: number;
     y: number;
   } | null>(null);
-  const [categories, setCategories] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [spots, setSpots] = useState<Array<any>>([]);
 
   useEffect(() => {
@@ -111,6 +117,7 @@ export default function Map({ initialCenter }: MapProps) {
           records.map((record) => ({
             id: record.id,
             name: record.name,
+            icon: record.icon,
           }))
         );
       } catch (error) {
@@ -154,11 +161,19 @@ export default function Map({ initialCenter }: MapProps) {
         user: pb.authStore.model?.id,
       };
 
-      await pb.collection("spots").create(data);
+      const newSpot = await pb.collection("spots").create(data);
       setShowTagForm(false);
       setSpotTitle("");
       setSpotDescription("");
       setSpotCategory("");
+
+      // Update the spots state with the new spot
+      setSpots((prevSpots) => [...prevSpots, newSpot]);
+
+      // Re-center the map on the new spot
+      if (mapRef.current) {
+        mapRef.current.setView([newSpot.lat, newSpot.lng], 13);
+      }
     } catch (error) {
       console.error("Failed to create spot:", error);
     }
@@ -168,24 +183,19 @@ export default function Map({ initialCenter }: MapProps) {
     e.preventDefault();
     console.log("Searching for:", searchQuery);
   };
+
   const fetchSpots = useCallback(async (bounds: L.LatLngBounds) => {
     try {
-      const center = bounds.getCenter();
       const ne = bounds.getNorthEast();
       const sw = bounds.getSouthWest();
+      const center = bounds.getCenter();
+      const radius = bounds.getNorthEast().distanceTo(center) / 1000; // km
 
-      // Fetch spots within the bounding box
       const result = await pb.collection("spots").getList(1, 1000, {
         filter: `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`,
         sort: "-created",
       });
 
-      console.log(result);
-
-      // Calculate the visible radius
-      const radius = bounds.getNorthEast().distanceTo(center) / 1000; // Convert to km
-
-      // Filter spots based on the Haversine distance
       const filteredSpots = result.items.filter((spot) => {
         const distance = haversineDistance(
           center.lat,
@@ -202,42 +212,114 @@ export default function Map({ initialCenter }: MapProps) {
     }
   }, []);
 
-  function MapEventHandler() {
-    const map = useMap();
+  const fetchSpotsRef = useRef(debounce(fetchSpots, 300));
 
-    useEffect(() => {
-      const handleMoveEnd = () => {
-        fetchSpots(map.getBounds());
-      };
+  useEffect(() => {
+    // Fetch spots on initial load
+    const initialBounds = L.latLngBounds(
+      L.latLng(center.lat - 0.1, center.lng - 0.1),
+      L.latLng(center.lat + 0.1, center.lng + 0.1)
+    );
+    fetchSpots(initialBounds);
+  }, [center, fetchSpots]);
 
-      map.on("moveend", handleMoveEnd);
-      handleMoveEnd(); // Fetch spots on initial load
+  // Create a function to get the icon for a spot
+  const getSpotIcon = useCallback(
+    (spot: any) => {
+      const category = categories.find((c) => c.id === spot.category);
+      const icon = category ? category.icon : "📍"; // Default to a pin if no category is found
+      const timeAgo = formatDistanceToNow(new Date(spot.created), {
+        addSuffix: true,
+      });
 
-      return () => {
-        map.off("moveend", handleMoveEnd);
-      };
-    }, [map]);
+      return L.divIcon({
+        html: `
+          <div class="spot-marker">
+            <span class="spot-icon">${icon}</span>
+            <div class="spot-text">
+              <span class="spot-title">${spot.name}</span>
+              <span class="spot-time">${timeAgo}</span>
+            </div>
+          </div>
+        `,
+        className: "custom-div-icon",
+        iconSize: [200, 50],
+        iconAnchor: [0, 25],
+      });
+    },
+    [categories]
+  );
 
-    return null;
-  }
+  // Add a ref for the map
+  const mapRef = useRef<L.Map | null>(null);
 
   return (
     <div className="relative h-full w-full">
+      <style jsx global>{`
+        .spot-marker {
+          display: flex;
+          align-items: center;
+          border-radius: 25px;
+        }
+        .spot-icon {
+          font-size: 24px;
+          margin-right: 8px;
+        }
+        .spot-text {
+          display: flex;
+          flex-direction: column;
+        }
+        .spot-title {
+          font-size: 14px;
+          font-weight: bold;
+          color: #333;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 150px;
+        }
+        .spot-time {
+          font-size: 10px;
+          color: #666;
+          white-space: nowrap;
+          align-self: flex-end;
+        }
+      `}</style>
       <MapContainer
         className="h-full w-full z-0"
         center={[center.lat, center.lng]}
         zoom={13}
         zoomControl={false}
+        ref={mapRef}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {spots.map((spot) => (
-          <Marker key={spot.id} position={[spot.lat, spot.lng]}>
+          <Marker
+            key={spot.id}
+            position={[spot.lat, spot.lng]}
+            icon={getSpotIcon(spot)}
+          >
             <Popup>
-              <h3 className="font-bold">{spot.name}</h3>
-              <p>{spot.description}</p>
+              <div className="p-2">
+                <h3 className="font-bold text-lg">{spot.name}</h3>
+                <p className="text-sm text-gray-600">{spot.description}</p>
+                {spot.category && (
+                  <p className="text-xs text-blue-500 mt-1">
+                    Category:{" "}
+                    <span
+                      style={{ fontSize: "1.2em", verticalAlign: "middle" }}
+                    >
+                      {categories.find((c) => c.id === spot.category)?.icon ||
+                        "📍"}
+                    </span>{" "}
+                    {categories.find((c) => c.id === spot.category)?.name ||
+                      spot.category}
+                  </p>
+                )}
+              </div>
             </Popup>
           </Marker>
         ))}
@@ -245,7 +327,6 @@ export default function Map({ initialCenter }: MapProps) {
         {mode === "pin" && <TaggingCursor />}
         <MapEvents onClick={handleMapClick} />
         <MapInteractionController mode={mode} />
-        <MapEventHandler />
       </MapContainer>
 
       <div className="absolute top-4 left-4 z-10 w-64">
@@ -333,6 +414,16 @@ export default function Map({ initialCenter }: MapProps) {
               <SelectContent className="z-30">
                 {categories.map((category) => (
                   <SelectItem key={category.id} value={category.id}>
+                    <span
+                      className="mr-2 text-xl"
+                      style={{
+                        display: "inline-block",
+                        width: "1.5em",
+                        textAlign: "center",
+                      }}
+                    >
+                      {category.icon}
+                    </span>
                     {category.name}
                   </SelectItem>
                 ))}
