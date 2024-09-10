@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useContext } from "react";
 import L from "leaflet";
 import {
   MapContainer,
@@ -52,7 +52,7 @@ function SetViewOnClick({ center }: { center: { lat: number; lng: number } }) {
   return null;
 }
 
-function ZoomButtons() {
+function ZoomButtons({ showListView }: { showListView: boolean }) {
   const map = useMapEvents({});
 
   const handleZoom = useCallback(
@@ -64,7 +64,9 @@ function ZoomButtons() {
   );
 
   return (
-    <div className="absolute bottom-4 right-4 z-[1001] flex flex-col space-y-2">
+    <div className={`absolute bottom-4 right-4 z-[1001] flex flex-col space-y-2 transition-all duration-300 ease-in-out ${
+      showListView ? 'mr-80' : ''
+    }`}>
       <button
         onClick={() => handleZoom(1)}
         className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-16 h-16 flex items-center justify-center text-xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
@@ -490,32 +492,41 @@ export default function Map({ initialCenter }: MapProps) {
           position: absolute !important;
         }
       `}</style>
-      <MapContainer
-        className="h-full w-full z-0"
-        center={[center.lat, center.lng]}
-        zoom={13}
-        zoomControl={false}
-        ref={mapRef}
+      
+      <div 
+        className={`transition-all duration-300 ease-in-out ${
+          showListView ? 'mr-80' : ''
+        }`}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <DynamicMarkers
-          spots={spots}
-          categories={categories}
-          handleSpotDelete={handleSpotDelete}
-          handleSpotUpdate={handleSpotUpdate}
-          user={user}
-          isAdmin={isAdmin}
-        />
-        {mode === "move" && <ZoomButtons />}
-        {mode === "pin" && <TaggingCursor />}
-        <MapEvents onClick={handleMapClick} />
-        <MapInteractionController mode={mode} />
-      </MapContainer>
+        <MapContainer
+          className="h-full w-full z-0"
+          center={[center.lat, center.lng]}
+          zoom={13}
+          zoomControl={false}
+          ref={mapRef}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <DynamicMarkers
+            spots={spots}
+            categories={categories}
+            handleSpotDelete={handleSpotDelete}
+            handleSpotUpdate={handleSpotUpdate}
+            user={user}
+            isAdmin={isAdmin}
+          />
+          {mode === "move" && <ZoomButtons showListView={showListView} />}
+          {mode === "pin" && <TaggingCursor />}
+          <MapEvents onClick={handleMapClick} />
+          <MapInteractionController mode={mode} />
+        </MapContainer>
+      </div>
 
-      <div className="absolute top-4 right-4 z-10 flex flex-col space-y-3">
+      <div className={`absolute top-4 right-4 z-10 flex flex-col space-y-3 transition-all duration-300 ease-in-out ${
+        showListView ? 'mr-80' : ''
+      }`}>
         <button
           onClick={() => handleModeChange("move")}
           className={`${
@@ -527,98 +538,102 @@ export default function Map({ initialCenter }: MapProps) {
           ✋
         </button>
         {user ? (
-          <button
-            onClick={() => handleModeChange("pin")}
-            className={`${
-              mode === "pin"
-                ? "bg-blue-500 text-white"
-                : "bg-white text-gray-700"
-            } border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200`}
-          >
-            📍
-          </button>
+          <>
+            <button
+              onClick={() => handleModeChange("pin")}
+              className={`${
+                mode === "pin"
+                  ? "bg-blue-500 text-white"
+                  : "bg-white text-gray-700"
+              } border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200`}
+            >
+              📍
+            </button>
+            <button
+              onClick={handleListViewToggle}
+              className={`
+                ${
+                  showListView ? "bg-blue-500 text-white" : "bg-white text-gray-700"
+                }
+                border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg
+                hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
+                transition-colors duration-200
+              `}
+            >
+              <List size={32} />
+            </button>
+          </>
         ) : (
           <Dialog>
             <DialogTrigger asChild>
-              <button className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"></button>
+              <button className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200">
+                📍
+              </button>
             </DialogTrigger>
             <DialogContent>
               <AuthDialog onClose={() => {}} />
             </DialogContent>
           </Dialog>
         )}
-        <button
-          onClick={handleListViewToggle}
-          className={`
-            ${
-              showListView ? "bg-blue-500 text-white" : "bg-white text-gray-700"
-            }
-            border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg
-            hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
-            transition-colors duration-200
-          `}
-        >
-          <List size={32} />
-        </button>
       </div>
 
       {/* List View Sidebar */}
-      {showListView && (
-        <div
-          className="
-            absolute top-0 right-0 h-full w-80 bg-white shadow-lg z-20
-            transform transition-transform duration-300 ease-in-out
-          "
-        >
-          <div className="h-full flex flex-col">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h2 className="text-xl font-bold">Your Spots</h2>
-              <button
-                onClick={handleListViewToggle}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <ChevronRight size={24} />
-              </button>
-            </div>
-            <ScrollArea className="flex-grow">
-              <div className="p-4">
-                {userSpots.map((spot) => (
-                  <div
-                    key={spot.id}
-                    className="mb-4 p-3 bg-gray-100 rounded-lg"
-                  >
-                    <h3 className="font-semibold">{spot.name}</h3>
-                    <p className="text-sm text-gray-600">{spot.description}</p>
-                    <button
-                      onClick={() => {
-                        if (mapRef.current) {
-                          mapRef.current.setView([spot.lat, spot.lng], 15);
-                        }
-                        setShowListView(false);
-                      }}
-                      className="mt-2 text-blue-500 hover:text-blue-700 text-sm"
-                    >
-                      View on map
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+      <div
+        className={`
+          absolute top-0 right-0 h-full w-80 bg-white shadow-lg z-20
+          transform transition-all duration-300 ease-in-out
+          ${showListView ? 'translate-x-0' : 'translate-x-full'}
+        `}
+      >
+        <div className="h-full flex flex-col">
+          <div className="flex justify-between items-center p-4 border-b">
+            <h2 className="text-xl font-bold">Your Spots</h2>
+            <button
+              onClick={handleListViewToggle}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <ChevronRight size={24} />
+            </button>
           </div>
+          <ScrollArea className="flex-grow">
+            <div className="p-4">
+              {userSpots.map((spot) => (
+                <div
+                  key={spot.id}
+                  className="mb-4 p-3 bg-gray-100 rounded-lg"
+                >
+                  <h3 className="font-semibold">{spot.name}</h3>
+                  <p className="text-sm text-gray-600">{spot.description}</p>
+                  <button
+                    onClick={() => {
+                      if (mapRef.current) {
+                        mapRef.current.setView([spot.lat, spot.lng], 15);
+                      }
+                      setShowListView(false);
+                    }}
+                    className="mt-2 text-blue-500 hover:text-blue-700 text-sm"
+                  >
+                    View on map
+                  </button>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
-      )}
+      </div>
 
       {showTagForm && clickPosition && (
         <div
           className={cn(
             "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-80",
             "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2",
-            "before:border-8 before:border-transparent before:border-t-white"
+            "before:border-8 before:border-transparent before:border-t-white",
+            showListView ? 'mr-80' : ''
           )}
           style={{
             left: `${clickPosition.x}px`,
             top: `${clickPosition.y - 75}px`,
-            transform: "translate(-50%, -100%)",
+            transform: 'translate(-50%, -100%)',
           }}
         >
           <form onSubmit={handleSpotSubmit} className="space-y-4">
