@@ -94,7 +94,7 @@ function TaggingCursor() {
 }
 
 export default function Map({ initialCenter }: MapProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [mode, setMode] = useState<"move" | "pin">("move");
   const [center] = useState(initialCenter);
   const [searchQuery, setSearchQuery] = useState("");
@@ -197,8 +197,15 @@ export default function Map({ initialCenter }: MapProps) {
       const center = bounds.getCenter();
       const radius = bounds.getNorthEast().distanceTo(center) / 1000; // km
 
+      let filter = `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`;
+      
+      // If the user is not an admin, only fetch public spots or spots owned by the user
+      if (!isAdmin) {
+        filter += ` && (isPublic = true || user = "${user?.id}")`;
+      }
+
       const result = await pb.collection("spots").getList(1, 1000, {
-        filter: `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`,
+        filter: filter,
         sort: "-created",
       });
 
@@ -216,7 +223,7 @@ export default function Map({ initialCenter }: MapProps) {
     } catch (error) {
       console.error("Error fetching spots:", error);
     }
-  }, []);
+  }, [isAdmin, user]);
 
   const fetchSpotsRef = useRef(debounce(fetchSpots, 300));
 
@@ -327,6 +334,18 @@ export default function Map({ initialCenter }: MapProps) {
             1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff,
             0.5px 0.5px 0 #fff, -0.5px -0.5px 0 #fff, 0.5px -0.5px 0 #fff, -0.5px 0.5px 0 #fff;
         }
+
+        .leaflet-popup-content-wrapper {
+          background: transparent;
+          box-shadow: none;
+        }
+        .leaflet-popup-content {
+          margin: 0;
+          width: auto !important;
+        }
+        .leaflet-popup-tip-container {
+          display: none;
+        }
       `}</style>
       <MapContainer
         className="h-full w-full z-0"
@@ -346,8 +365,20 @@ export default function Map({ initialCenter }: MapProps) {
             icon={getSpotIcon(spot)}
           >
             <Popup className="custom-popup">
-              <div className="p-4 bg-white rounded-lg shadow-lg w-80">
-                <h3 className="font-nunito font-extrabold text-2xl text-blue-600 mb-2">{spot.name}</h3>
+              <div className="p-4 bg-white rounded-lg shadow-lg w-64">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-nunito font-extrabold text-xl text-blue-600">{spot.name}</h3>
+                  {(isAdmin || user?.id === spot.user) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSpotDelete(spot.id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ❌
+                    </Button>
+                  )}
+                </div>
                 <p className="font-nunito text-sm text-gray-700 mb-3">{spot.description}</p>
                 {spot.category && (
                   <div className="flex items-center mb-3">
@@ -359,45 +390,21 @@ export default function Map({ initialCenter }: MapProps) {
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
-                  <span>Added by: {spot.user === user?.id ? 'You' : 'Another user'}</span>
-                  <span>Rating: ⭐⭐⭐⭐☆</span>
+                <div className="text-xs text-gray-500 mb-3">
+                  Added by: {spot.user === user?.id ? 'You' : 'Another user'}
                 </div>
-                {user && (user.id === spot.user) && (
-                  <div className="flex items-center space-x-2 mb-3">
+                {(isAdmin || user?.id === spot.user) && (
+                  <div className="flex items-center space-x-2">
                     <Switch
                       id={`public-switch-${spot.id}`}
                       checked={spot.isPublic}
                       onCheckedChange={(checked) => handleSpotUpdate(spot.id, checked)}
                     />
-                    <Label htmlFor={`public-switch-${spot.id}`}>
+                    <Label htmlFor={`public-switch-${spot.id}`} className="text-sm">
                       {spot.isPublic ? "Public" : "Private"}
                     </Label>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <Button className="bg-blue-500 hover:bg-blue-600 text-white font-nunito font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105">
-                    More Details
-                  </Button>
-                  {user && (user.id === spot.user) && (
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => {/* Implement edit functionality */}}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => handleSpotDelete(spot.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
               </div>
             </Popup>
           </Marker>
@@ -434,7 +441,7 @@ export default function Map({ initialCenter }: MapProps) {
         >
           ✋
         </button>
-        {isAuthenticated ? (
+        {user ? (
           <button
             onClick={() => handleModeChange("pin")}
             className={`${

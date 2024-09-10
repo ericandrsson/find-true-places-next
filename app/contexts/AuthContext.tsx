@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { pb } from "@/lib/db";
 import { useRouter } from "next/navigation";
-import type { AuthProviderInfo, Record } from "pocketbase";
+import type { AuthProviderInfo, RecordModel } from "pocketbase";
 
 interface PbUser {
   id: string;
@@ -11,26 +11,31 @@ interface PbUser {
   email: string;
   username: string;
   avatarUrl: string;
+  isAdmin?: boolean;
 }
 
 type AuthContextType = {
   user: PbUser | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   register: (email: string, password: string) => Promise<void>;
   googleSignIn: () => void;
   githubSignIn: () => void;
-  setUserData: (user: Record) => void;
+  setUserData: (user: RecordModel) => void;
 };
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<PbUser | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [googleAuthProvider, setGoogleAuthProvider] =
     useState<AuthProviderInfo | null>(null);
   const [githubAuthProvider, setGithubAuthProvider] =
@@ -43,9 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (authData) {
         setIsAuthenticated(true);
         setUserData(authData);
+        setIsAdmin(authData.isAdmin || false);
       } else {
         setIsAuthenticated(false);
         setUser(null);
+        setIsAdmin(false);
       }
 
       const authMethods = await pb
@@ -65,34 +72,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     initAuth();
 
-    // Add this listener to update auth state on changes
     pb.authStore.onChange(() => {
       setIsAuthenticated(pb.authStore.isValid);
       if (pb.authStore.model) {
         setUserData(pb.authStore.model);
       } else {
         setUser(null);
+        setIsAdmin(false);
       }
     });
   }, []);
 
-  const setUserData = (pbUser: Record) => {
-    const { id, name, email, username, avatarUrl } = pbUser;
-    setUser({ id, name, email, username, avatarUrl });
+  const setUserData = (pbUser: RecordModel) => {
+    const { id, name, email, username, avatarUrl, isAdmin: userIsAdmin } = pbUser;
+    setUser({ id, name, email, username, avatarUrl, isAdmin: userIsAdmin });
+    setIsAdmin(userIsAdmin || false);
   };
 
   const login = async (email: string, password: string) => {
-    const authData = await pb
-      .collection("users")
-      .authWithPassword(email, password);
-    setIsAuthenticated(true);
-    setUserData(authData.record);
+    try {
+      const authData = await pb
+        .collection("users")
+        .authWithPassword(email, password);
+      setIsAuthenticated(true);
+      setUserData(authData.record);
+    } catch (error) {
+      console.error("Login failed:", error);
+      throw error;
+    }
   };
 
   const logout = () => {
     pb.authStore.clear();
     setIsAuthenticated(false);
     setUser(null);
+    setIsAdmin(false);
   };
 
   const register = async (email: string, password: string) => {
@@ -125,6 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         isAuthenticated,
         user,
+        isAdmin,
         login,
         logout,
         register,
