@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useContext } from "react";
-import L from "leaflet";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   MapContainer,
   TileLayer,
   useMap,
-  Marker,
   useMapEvents,
+  Marker,
   Popup,
 } from "react-leaflet";
+import L from "leaflet";
+import debounce from "lodash/debounce";
 import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,12 +29,14 @@ import { useAuth } from "@/app/contexts/AuthContext";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import AuthDialog from "./AuthDialog";
 import { haversineDistance } from "@/lib/utils";
-import debounce from "lodash/debounce";
 import { formatDistanceToNow } from "date-fns";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Trash2, Edit, ChevronRight, ChevronLeft, List } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+const MIN_ZOOM = 6; // 1 is most zoomed in (street level)
+const MAX_ZOOM = 18; // 10 is most zoomed out (world level)
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -42,6 +46,27 @@ interface Category {
   id: string;
   name: string;
   icon: string;
+}
+
+interface Spot {
+  id: string;
+  name: string;
+  description: string;
+  lat: number;
+  lng: number;
+  category: string;
+  user: string;
+  isPublic: boolean;
+  created: string;
+}
+
+interface DynamicMarkersProps {
+  spots: Spot[];
+  categories: Category[];
+  handleSpotDelete: (spotId: string) => Promise<void>;
+  handleSpotUpdate: (spotId: string, isPublic: boolean) => Promise<void>;
+  user: { id: string } | null;
+  isAdmin: boolean;
 }
 
 function SetViewOnClick({ center }: { center: { lat: number; lng: number } }) {
@@ -58,15 +83,21 @@ function ZoomButtons({ showListView }: { showListView: boolean }) {
   const handleZoom = useCallback(
     (delta: number) => {
       const currentZoom = map.getZoom();
-      map.setZoom(currentZoom + delta);
+      const newZoom = Math.max(
+        MIN_ZOOM,
+        Math.min(MAX_ZOOM, currentZoom + delta)
+      );
+      map.setZoom(newZoom);
     },
     [map]
   );
 
   return (
-    <div className={`absolute bottom-4 right-4 z-[1001] flex flex-col space-y-2 transition-all duration-300 ease-in-out ${
-      showListView ? 'mr-80' : ''
-    }`}>
+    <div
+      className={`absolute bottom-4 right-4 z-[1001] flex flex-col space-y-2 transition-all duration-300 ease-in-out ${
+        showListView ? "mr-80" : ""
+      }`}
+    >
       <button
         onClick={() => handleZoom(1)}
         className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-16 h-16 flex items-center justify-center text-xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
@@ -103,7 +134,7 @@ function DynamicMarkers({
   handleSpotUpdate,
   user,
   isAdmin,
-}) {
+}: DynamicMarkersProps) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
 
@@ -120,21 +151,20 @@ function DynamicMarkers({
   }, [map]);
 
   const getSpotIcon = useCallback(
-    (spot: any) => {
-      const category = categories.find((c) => c.id === spot.category);
+    (spot: Spot) => {
+      const category = categories.find((c: Category) => c.id === spot.category);
       const icon = category ? category.icon : "📍";
       const timeAgo = formatDistanceToNow(new Date(spot.created), {
         addSuffix: true,
       });
 
-      // Adjust size based on zoom level
-      const baseSize = 24; // Base size in pixels
-      const minZoom = 10; // Minimum zoom level
-      const maxZoom = 18; // Maximum zoom level
+      const baseSize = 24;
+      const minZoom = 10;
+      const maxZoom = 18;
       const zoomFactor = Math.max(0, (zoom - minZoom) / (maxZoom - minZoom));
-      const sizeMultiplier = 1 + zoomFactor * 2; // Increase size up to 3x at max zoom
+      const sizeMultiplier = 1 + zoomFactor * 2;
       const size = Math.round(baseSize * sizeMultiplier);
-      const fontSize = Math.max(10, Math.round(14 * sizeMultiplier)); // Minimum font size of 10px
+      const fontSize = Math.max(10, Math.round(14 * sizeMultiplier));
 
       return L.divIcon({
         html: `
@@ -156,7 +186,7 @@ function DynamicMarkers({
 
   return (
     <>
-      {spots.map((spot) => (
+      {spots.map((spot: Spot) => (
         <Marker
           key={spot.id}
           position={[spot.lat, spot.lng]}
@@ -225,7 +255,7 @@ function DynamicMarkers({
 export default function Map({ initialCenter }: MapProps) {
   const { user, isAdmin } = useAuth();
   const [mode, setMode] = useState<"move" | "pin">("move");
-  const [center] = useState(initialCenter);
+  const [center, setCenter] = useState(initialCenter);
   const [searchQuery, setSearchQuery] = useState("");
   const [showTagForm, setShowTagForm] = useState(false);
   const [tagPosition, setTagPosition] = useState<[number, number] | null>(null);
@@ -237,10 +267,124 @@ export default function Map({ initialCenter }: MapProps) {
     y: number;
   } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [spots, setSpots] = useState<Array<any>>([]);
+  const [spots, setSpots] = useState<Spot[]>([]);
   const [isPublic, setIsPublic] = useState(true);
   const [showListView, setShowListView] = useState(false);
-  const [userSpots, setUserSpots] = useState<Array<any>>([]);
+  const [userSpots, setUserSpots] = useState<Spot[]>([]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [mapZoom, setMapZoom] = useState(13);
+  const mapRef = useRef<L.Map | null>(null);
+
+  useEffect(() => {
+    const lat = searchParams.get("lat");
+    const lng = searchParams.get("lng");
+    const zoom = searchParams.get("zoom");
+    if (lat && lng && zoom) {
+      setCenter({ lat: parseFloat(lat), lng: parseFloat(lng) });
+      setMapZoom(parseInt(zoom));
+    }
+  }, [searchParams]);
+
+  const updateUrlParams = useCallback(
+    (lat: number, lng: number, zoom: number) => {
+      const params = new URLSearchParams(window.location.search);
+      params.set("lat", lat.toFixed(6));
+      params.set("lng", lng.toFixed(6));
+      params.set("zoom", zoom.toString());
+      router.push(`${window.location.pathname}?${params.toString()}`, {
+        scroll: false,
+      });
+    },
+    [router]
+  );
+
+  const fetchSpots = useCallback(
+    async (bounds: L.LatLngBounds) => {
+      try {
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const center = bounds.getCenter();
+        const radius = bounds.getNorthEast().distanceTo(center) / 1000; // km
+
+        let filter = `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`;
+
+        if (!isAdmin) {
+          filter += ` && (isPublic = true || user = "${user?.id}")`;
+        }
+
+        const result = await pb.collection("spots").getList<Spot>(1, 1000, {
+          filter: filter,
+          sort: "-created",
+        });
+
+        const filteredSpots = result.items.filter((spot: any) => {
+          const distance = haversineDistance(
+            center.lat,
+            center.lng,
+            spot.lat,
+            spot.lng
+          );
+          return distance <= radius;
+        });
+
+        setSpots(filteredSpots);
+      } catch (error) {
+        console.error("Error fetching spots:", error);
+      }
+    },
+    [isAdmin, user]
+  );
+
+  const debouncedFetchSpots = useMemo(
+    () =>
+      debounce((bounds: L.LatLngBounds) => {
+        fetchSpots(bounds);
+      }, 300),
+    [fetchSpots]
+  );
+
+  const handleMapMove = useCallback(() => {
+    if (mapRef.current) {
+      const center = mapRef.current.getCenter();
+      const zoom = mapRef.current.getZoom();
+      updateUrlParams(center.lat, center.lng, zoom);
+      debouncedFetchSpots(mapRef.current.getBounds());
+    }
+  }, [updateUrlParams, debouncedFetchSpots]);
+
+  function MapEventHandler() {
+    const map = useMapEvents({
+      moveend: handleMapMove,
+      zoomend: handleMapMove,
+    });
+
+    useEffect(() => {
+      mapRef.current = map;
+    }, [map]);
+
+    return null;
+  }
+
+  const handleSetCurrentLocation = useCallback(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          if (mapRef.current) {
+            const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, 13));
+            mapRef.current.setView([latitude, longitude], newZoom);
+            updateUrlParams(latitude, longitude, newZoom);
+          }
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        }
+      );
+    } else {
+      console.error("Geolocation is not supported by this browser.");
+    }
+  }, [updateUrlParams]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -297,17 +441,15 @@ export default function Map({ initialCenter }: MapProps) {
         isPublic: isPublic,
       };
 
-      const newSpot = await pb.collection("spots").create(data);
+      const newSpot = await pb.collection("spots").create<Spot>(data);
       setShowTagForm(false);
       setSpotTitle("");
       setSpotDescription("");
       setSpotCategory("");
       setIsPublic(true);
 
-      // Update the spots state with the new spot
       setSpots((prevSpots) => [...prevSpots, newSpot]);
 
-      // Re-center the map on the new spot
       if (mapRef.current) {
         mapRef.current.setView([newSpot.lat, newSpot.lng], 13);
       }
@@ -321,48 +463,7 @@ export default function Map({ initialCenter }: MapProps) {
     console.log("Searching for:", searchQuery);
   };
 
-  const fetchSpots = useCallback(
-    async (bounds: L.LatLngBounds) => {
-      try {
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
-        const center = bounds.getCenter();
-        const radius = bounds.getNorthEast().distanceTo(center) / 1000; // km
-
-        let filter = `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`;
-
-        // If the user is not an admin, only fetch public spots or spots owned by the user
-        if (!isAdmin) {
-          filter += ` && (isPublic = true || user = "${user?.id}")`;
-        }
-
-        const result = await pb.collection("spots").getList(1, 1000, {
-          filter: filter,
-          sort: "-created",
-        });
-
-        const filteredSpots = result.items.filter((spot) => {
-          const distance = haversineDistance(
-            center.lat,
-            center.lng,
-            spot.lat,
-            spot.lng
-          );
-          return distance <= radius;
-        });
-
-        setSpots(filteredSpots);
-      } catch (error) {
-        console.error("Error fetching spots:", error);
-      }
-    },
-    [isAdmin, user]
-  );
-
-  const fetchSpotsRef = useRef(debounce(fetchSpots, 300));
-
   useEffect(() => {
-    // Fetch spots on initial load
     const initialBounds = L.latLngBounds(
       L.latLng(center.lat - 0.1, center.lng - 0.1),
       L.latLng(center.lat + 0.1, center.lng + 0.1)
@@ -370,13 +471,9 @@ export default function Map({ initialCenter }: MapProps) {
     fetchSpots(initialBounds);
   }, [center, fetchSpots]);
 
-  // Add a ref for the map
-  const mapRef = useRef<L.Map | null>(null);
-
   const handleSpotUpdate = async (spotId: string, isPublic: boolean) => {
     try {
       await pb.collection("spots").update(spotId, { isPublic });
-      // Update the local state to reflect the change
       setSpots(
         spots.map((spot) => (spot.id === spotId ? { ...spot, isPublic } : spot))
       );
@@ -388,7 +485,6 @@ export default function Map({ initialCenter }: MapProps) {
   const handleSpotDelete = async (spotId: string) => {
     try {
       await pb.collection("spots").delete(spotId);
-      // Remove the deleted spot from the local state
       setSpots(spots.filter((spot) => spot.id !== spotId));
     } catch (error) {
       console.error("Failed to delete spot:", error);
@@ -399,7 +495,7 @@ export default function Map({ initialCenter }: MapProps) {
     const fetchUserSpots = async () => {
       if (user) {
         try {
-          const result = await pb.collection("spots").getList(1, 50, {
+          const result = await pb.collection("spots").getList<Spot>(1, 50, {
             filter: `user = "${user.id}"`,
             sort: "-created",
           });
@@ -438,7 +534,7 @@ export default function Map({ initialCenter }: MapProps) {
           flex-direction: column;
           align-items: center;
           margin-top: -5px;
-          width: 150px; /* Set a fixed width */
+          width: 150px;
         }
         .spot-title {
           font-family: "Nunito", sans-serif;
@@ -459,11 +555,11 @@ export default function Map({ initialCenter }: MapProps) {
           font-weight: 600;
           color: #6b7280;
           text-align: center;
-          white-space: normal; /* Allow wrapping */
-          word-wrap: break-word; /* Break long words if necessary */
-          max-width: 150px; /* Match the width of spot-text */
-          line-height: 1.2; /* Adjust line height for better readability */
-          margin-top: 2px; /* Add a small gap between title and time */
+          white-space: normal;
+          word-wrap: break-word;
+          max-width: 150px;
+          line-height: 1.2;
+          margin-top: 2px;
           text-shadow: 1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff,
             0.5px 0.5px 0 #fff, -0.5px -0.5px 0 #fff, 0.5px -0.5px 0 #fff,
             -0.5px 0.5px 0 #fff;
@@ -492,18 +588,19 @@ export default function Map({ initialCenter }: MapProps) {
           position: absolute !important;
         }
       `}</style>
-      
-      <div 
+
+      <div
         className={`transition-all duration-300 ease-in-out ${
-          showListView ? 'mr-80' : ''
+          showListView ? "mr-80" : ""
         }`}
       >
         <MapContainer
           className="h-full w-full z-0"
           center={[center.lat, center.lng]}
-          zoom={13}
+          zoom={mapZoom}
           zoomControl={false}
-          ref={mapRef}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -521,12 +618,15 @@ export default function Map({ initialCenter }: MapProps) {
           {mode === "pin" && <TaggingCursor />}
           <MapEvents onClick={handleMapClick} />
           <MapInteractionController mode={mode} />
+          <MapEventHandler />
         </MapContainer>
       </div>
 
-      <div className={`absolute top-4 right-4 z-10 flex flex-col space-y-3 transition-all duration-300 ease-in-out ${
-        showListView ? 'mr-80' : ''
-      }`}>
+      <div
+        className={`absolute top-4 right-4 z-10 flex flex-col space-y-3 transition-all duration-300 ease-in-out ${
+          showListView ? "mr-80" : ""
+        }`}
+      >
         <button
           onClick={() => handleModeChange("move")}
           className={`${
@@ -553,7 +653,9 @@ export default function Map({ initialCenter }: MapProps) {
               onClick={handleListViewToggle}
               className={`
                 ${
-                  showListView ? "bg-blue-500 text-white" : "bg-white text-gray-700"
+                  showListView
+                    ? "bg-blue-500 text-white"
+                    : "bg-white text-gray-700"
                 }
                 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg
                 hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
@@ -577,63 +679,18 @@ export default function Map({ initialCenter }: MapProps) {
         )}
       </div>
 
-      {/* List View Sidebar */}
-      <div
-        className={`
-          absolute top-0 right-0 h-full w-80 bg-white shadow-lg z-20
-          transform transition-all duration-300 ease-in-out
-          ${showListView ? 'translate-x-0' : 'translate-x-full'}
-        `}
-      >
-        <div className="h-full flex flex-col">
-          <div className="flex justify-between items-center p-4 border-b">
-            <h2 className="text-xl font-bold">Your Spots</h2>
-            <button
-              onClick={handleListViewToggle}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <ChevronRight size={24} />
-            </button>
-          </div>
-          <ScrollArea className="flex-grow">
-            <div className="p-4">
-              {userSpots.map((spot) => (
-                <div
-                  key={spot.id}
-                  className="mb-4 p-3 bg-gray-100 rounded-lg"
-                >
-                  <h3 className="font-semibold">{spot.name}</h3>
-                  <p className="text-sm text-gray-600">{spot.description}</p>
-                  <button
-                    onClick={() => {
-                      if (mapRef.current) {
-                        mapRef.current.setView([spot.lat, spot.lng], 15);
-                      }
-                      setShowListView(false);
-                    }}
-                    className="mt-2 text-blue-500 hover:text-blue-700 text-sm"
-                  >
-                    View on map
-                  </button>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-      </div>
-
       {showTagForm && clickPosition && (
         <div
           className={cn(
             "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-80",
             "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2",
             "before:border-8 before:border-transparent before:border-t-white",
-            showListView ? 'mr-80' : ''
+            showListView ? "mr-80" : ""
           )}
           style={{
             left: `${clickPosition.x}px`,
             top: `${clickPosition.y - 75}px`,
-            transform: 'translate(-50%, -100%)',
+            transform: "translate(-50%, -100%)",
           }}
         >
           <form onSubmit={handleSpotSubmit} className="space-y-4">
@@ -698,6 +755,15 @@ export default function Map({ initialCenter }: MapProps) {
           </form>
         </div>
       )}
+
+      <div className="absolute bottom-4 left-4 z-[1001]">
+        <button
+          onClick={handleSetCurrentLocation}
+          className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-16 h-16 flex items-center justify-center text-xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
+        >
+          📍
+        </button>
+      </div>
     </div>
   );
 }
