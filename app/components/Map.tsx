@@ -93,6 +93,132 @@ function TaggingCursor() {
   return null;
 }
 
+function DynamicMarkers({
+  spots,
+  categories,
+  handleSpotDelete,
+  handleSpotUpdate,
+  user,
+  isAdmin,
+}) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+
+  useEffect(() => {
+    const updateZoom = () => {
+      setZoom(map.getZoom());
+    };
+
+    map.on("zoomend", updateZoom);
+
+    return () => {
+      map.off("zoomend", updateZoom);
+    };
+  }, [map]);
+
+  const getSpotIcon = useCallback(
+    (spot: any) => {
+      const category = categories.find((c) => c.id === spot.category);
+      const icon = category ? category.icon : "📍";
+      const timeAgo = formatDistanceToNow(new Date(spot.created), {
+        addSuffix: true,
+      });
+
+      // Adjust size based on zoom level
+      const baseSize = 24; // Base size in pixels
+      const minZoom = 10; // Minimum zoom level
+      const maxZoom = 18; // Maximum zoom level
+      const zoomFactor = Math.max(0, (zoom - minZoom) / (maxZoom - minZoom));
+      const sizeMultiplier = 1 + zoomFactor * 2; // Increase size up to 3x at max zoom
+      const size = Math.round(baseSize * sizeMultiplier);
+      const fontSize = Math.max(10, Math.round(14 * sizeMultiplier)); // Minimum font size of 10px
+
+      return L.divIcon({
+        html: `
+          <div class="spot-marker" style="font-size: ${fontSize}px;">
+            <span class="spot-icon" style="font-size: ${size}px;">${icon}</span>
+            <div class="spot-text">
+              <span class="spot-title">${spot.name}</span>
+              <span class="spot-time">${timeAgo}</span>
+            </div>
+          </div>
+        `,
+        className: "custom-div-icon",
+        iconSize: [size * 1.5, size * 1.5],
+        iconAnchor: [size * 0.75, size * 1.5],
+      });
+    },
+    [categories, zoom]
+  );
+
+  return (
+    <>
+      {spots.map((spot) => (
+        <Marker
+          key={spot.id}
+          position={[spot.lat, spot.lng]}
+          icon={getSpotIcon(spot)}
+        >
+          <Popup className="custom-popup">
+            <div className="p-4 bg-white rounded-lg shadow-lg w-64">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-nunito font-extrabold text-xl text-blue-600">
+                  {spot.name}
+                </h3>
+                {(isAdmin || user?.id === spot.user) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSpotDelete(spot.id)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    ❌
+                  </Button>
+                )}
+              </div>
+              <p className="font-nunito text-sm text-gray-700 mb-3">
+                {spot.description}
+              </p>
+              {spot.category && (
+                <div className="flex items-center mb-3">
+                  <span className="text-2xl mr-2">
+                    {categories.find((c) => c.id === spot.category)?.icon ||
+                      "📍"}
+                  </span>
+                  <span className="font-nunito font-semibold text-sm text-purple-600">
+                    {categories.find((c) => c.id === spot.category)?.name ||
+                      spot.category}
+                  </span>
+                </div>
+              )}
+              <div className="text-xs text-gray-500 mb-3">
+                Added by: {spot.user === user?.id ? "You" : "Another user"}
+              </div>
+              {(isAdmin || user?.id === spot.user) && (
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id={`public-switch-${spot.id}`}
+                    checked={spot.isPublic}
+                    onCheckedChange={(checked) =>
+                      handleSpotUpdate(spot.id, checked)
+                    }
+                  />
+                  <Label
+                    htmlFor={`public-switch-${spot.id}`}
+                    className="text-sm"
+                  >
+                    {spot.isPublic ? "Public" : "Private"}
+                  </Label>
+                </div>
+              )}
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
+}
+
 export default function Map({ initialCenter }: MapProps) {
   const { user, isAdmin } = useAuth();
   const [mode, setMode] = useState<"move" | "pin">("move");
@@ -190,40 +316,43 @@ export default function Map({ initialCenter }: MapProps) {
     console.log("Searching for:", searchQuery);
   };
 
-  const fetchSpots = useCallback(async (bounds: L.LatLngBounds) => {
-    try {
-      const ne = bounds.getNorthEast();
-      const sw = bounds.getSouthWest();
-      const center = bounds.getCenter();
-      const radius = bounds.getNorthEast().distanceTo(center) / 1000; // km
+  const fetchSpots = useCallback(
+    async (bounds: L.LatLngBounds) => {
+      try {
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const center = bounds.getCenter();
+        const radius = bounds.getNorthEast().distanceTo(center) / 1000; // km
 
-      let filter = `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`;
-      
-      // If the user is not an admin, only fetch public spots or spots owned by the user
-      if (!isAdmin) {
-        filter += ` && (isPublic = true || user = "${user?.id}")`;
+        let filter = `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`;
+
+        // If the user is not an admin, only fetch public spots or spots owned by the user
+        if (!isAdmin) {
+          filter += ` && (isPublic = true || user = "${user?.id}")`;
+        }
+
+        const result = await pb.collection("spots").getList(1, 1000, {
+          filter: filter,
+          sort: "-created",
+        });
+
+        const filteredSpots = result.items.filter((spot) => {
+          const distance = haversineDistance(
+            center.lat,
+            center.lng,
+            spot.lat,
+            spot.lng
+          );
+          return distance <= radius;
+        });
+
+        setSpots(filteredSpots);
+      } catch (error) {
+        console.error("Error fetching spots:", error);
       }
-
-      const result = await pb.collection("spots").getList(1, 1000, {
-        filter: filter,
-        sort: "-created",
-      });
-
-      const filteredSpots = result.items.filter((spot) => {
-        const distance = haversineDistance(
-          center.lat,
-          center.lng,
-          spot.lat,
-          spot.lng
-        );
-        return distance <= radius;
-      });
-
-      setSpots(filteredSpots);
-    } catch (error) {
-      console.error("Error fetching spots:", error);
-    }
-  }, [isAdmin, user]);
+    },
+    [isAdmin, user]
+  );
 
   const fetchSpotsRef = useRef(debounce(fetchSpots, 300));
 
@@ -236,33 +365,6 @@ export default function Map({ initialCenter }: MapProps) {
     fetchSpots(initialBounds);
   }, [center, fetchSpots]);
 
-  // Create a function to get the icon for a spot
-  const getSpotIcon = useCallback(
-    (spot: any) => {
-      const category = categories.find((c) => c.id === spot.category);
-      const icon = category ? category.icon : "📍";
-      const timeAgo = formatDistanceToNow(new Date(spot.created), {
-        addSuffix: true,
-      });
-
-      return L.divIcon({
-        html: `
-          <div class="spot-marker">
-            <span class="spot-icon">${icon}</span>
-            <div class="spot-text">
-              <span class="spot-title">${spot.name}</span>
-              <span class="spot-time">${timeAgo}</span>
-            </div>
-          </div>
-        `,
-        className: "custom-div-icon",
-        iconSize: [200, 80],
-        iconAnchor: [100, 80],
-      });
-    },
-    [categories]
-  );
-
   // Add a ref for the map
   const mapRef = useRef<L.Map | null>(null);
 
@@ -270,9 +372,9 @@ export default function Map({ initialCenter }: MapProps) {
     try {
       await pb.collection("spots").update(spotId, { isPublic });
       // Update the local state to reflect the change
-      setSpots(spots.map(spot => 
-        spot.id === spotId ? { ...spot, isPublic } : spot
-      ));
+      setSpots(
+        spots.map((spot) => (spot.id === spotId ? { ...spot, isPublic } : spot))
+      );
     } catch (error) {
       console.error("Failed to update spot:", error);
     }
@@ -282,7 +384,7 @@ export default function Map({ initialCenter }: MapProps) {
     try {
       await pb.collection("spots").delete(spotId);
       // Remove the deleted spot from the local state
-      setSpots(spots.filter(spot => spot.id !== spotId));
+      setSpots(spots.filter((spot) => spot.id !== spotId));
     } catch (error) {
       console.error("Failed to delete spot:", error);
     }
@@ -309,9 +411,10 @@ export default function Map({ initialCenter }: MapProps) {
           flex-direction: column;
           align-items: center;
           margin-top: -5px;
+          width: 150px; /* Set a fixed width */
         }
         .spot-title {
-          font-family: 'Nunito', sans-serif;
+          font-family: "Nunito", sans-serif;
           font-size: 16px;
           font-weight: 800;
           color: #3b82f6;
@@ -320,19 +423,23 @@ export default function Map({ initialCenter }: MapProps) {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          text-shadow: 
-            2px 0 0 #fff, -2px 0 0 #fff, 0 2px 0 #fff, 0 -2px 0 #fff,
+          text-shadow: 2px 0 0 #fff, -2px 0 0 #fff, 0 2px 0 #fff, 0 -2px 0 #fff,
             1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
         }
         .spot-time {
-          font-family: 'Nunito', sans-serif;
+          font-family: "Nunito", sans-serif;
           font-size: 12px;
           font-weight: 600;
           color: #6b7280;
           text-align: center;
-          text-shadow: 
-            1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff,
-            0.5px 0.5px 0 #fff, -0.5px -0.5px 0 #fff, 0.5px -0.5px 0 #fff, -0.5px 0.5px 0 #fff;
+          white-space: normal; /* Allow wrapping */
+          word-wrap: break-word; /* Break long words if necessary */
+          max-width: 150px; /* Match the width of spot-text */
+          line-height: 1.2; /* Adjust line height for better readability */
+          margin-top: 2px; /* Add a small gap between title and time */
+          text-shadow: 1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff,
+            0.5px 0.5px 0 #fff, -0.5px -0.5px 0 #fff, 0.5px -0.5px 0 #fff,
+            -0.5px 0.5px 0 #fff;
         }
 
         .leaflet-popup-content-wrapper {
@@ -346,6 +453,11 @@ export default function Map({ initialCenter }: MapProps) {
         .leaflet-popup-tip-container {
           display: none;
         }
+
+        .custom-div-icon {
+          background: none;
+          border: none;
+        }
       `}</style>
       <MapContainer
         className="h-full w-full z-0"
@@ -358,77 +470,19 @@ export default function Map({ initialCenter }: MapProps) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {spots.map((spot) => (
-          <Marker
-            key={spot.id}
-            position={[spot.lat, spot.lng]}
-            icon={getSpotIcon(spot)}
-          >
-            <Popup className="custom-popup">
-              <div className="p-4 bg-white rounded-lg shadow-lg w-64">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-nunito font-extrabold text-xl text-blue-600">{spot.name}</h3>
-                  {(isAdmin || user?.id === spot.user) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSpotDelete(spot.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ❌
-                    </Button>
-                  )}
-                </div>
-                <p className="font-nunito text-sm text-gray-700 mb-3">{spot.description}</p>
-                {spot.category && (
-                  <div className="flex items-center mb-3">
-                    <span className="text-2xl mr-2">
-                      {categories.find((c) => c.id === spot.category)?.icon || "📍"}
-                    </span>
-                    <span className="font-nunito font-semibold text-sm text-purple-600">
-                      {categories.find((c) => c.id === spot.category)?.name || spot.category}
-                    </span>
-                  </div>
-                )}
-                <div className="text-xs text-gray-500 mb-3">
-                  Added by: {spot.user === user?.id ? 'You' : 'Another user'}
-                </div>
-                {(isAdmin || user?.id === spot.user) && (
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id={`public-switch-${spot.id}`}
-                      checked={spot.isPublic}
-                      onCheckedChange={(checked) => handleSpotUpdate(spot.id, checked)}
-                    />
-                    <Label htmlFor={`public-switch-${spot.id}`} className="text-sm">
-                      {spot.isPublic ? "Public" : "Private"}
-                    </Label>
-                  </div>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        <DynamicMarkers
+          spots={spots}
+          categories={categories}
+          handleSpotDelete={handleSpotDelete}
+          handleSpotUpdate={handleSpotUpdate}
+          user={user}
+          isAdmin={isAdmin}
+        />
         {mode === "move" && <ZoomButtons />}
         {mode === "pin" && <TaggingCursor />}
         <MapEvents onClick={handleMapClick} />
         <MapInteractionController mode={mode} />
       </MapContainer>
-
-      <div className="absolute top-4 left-4 z-10 w-64">
-        <form onSubmit={handleSearch} className="flex flex-col gap-2">
-          <Input
-            type="text"
-            placeholder="Search for a location"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-white"
-          />
-          <Button type="submit" className="w-full">
-            Search
-          </Button>
-        </form>
-      </div>
 
       <div className="absolute top-4 right-4 z-10 flex flex-col space-y-3">
         <button
