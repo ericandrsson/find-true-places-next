@@ -302,19 +302,6 @@ export default function Map({ initialCenter }: MapProps) {
     }
   }, [searchParams]);
 
-  const updateUrlParams = useCallback(
-    (lat: number, lng: number, zoom: number) => {
-      const params = new URLSearchParams(window.location.search);
-      params.set("lat", lat.toFixed(6));
-      params.set("lng", lng.toFixed(6));
-      params.set("zoom", zoom.toString());
-      router.push(`${window.location.pathname}?${params.toString()}`, {
-        scroll: false,
-      });
-    },
-    [router]
-  );
-
   const fetchSpots = useCallback(
     async (bounds: L.LatLngBounds) => {
       try {
@@ -362,12 +349,9 @@ export default function Map({ initialCenter }: MapProps) {
 
   const handleMapMove = useCallback(() => {
     if (mapRef.current) {
-      const center = mapRef.current.getCenter();
-      const zoom = mapRef.current.getZoom();
-      updateUrlParams(center.lat, center.lng, zoom);
       debouncedFetchSpots(mapRef.current.getBounds());
     }
-  }, [updateUrlParams, debouncedFetchSpots]);
+  }, [debouncedFetchSpots]);
 
   function MapEventHandler() {
     const map = useMapEvents({
@@ -390,7 +374,6 @@ export default function Map({ initialCenter }: MapProps) {
           if (mapRef.current) {
             const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, 13));
             mapRef.current.setView([latitude, longitude], newZoom);
-            updateUrlParams(latitude, longitude, newZoom);
           }
         },
         (error) => {
@@ -400,7 +383,7 @@ export default function Map({ initialCenter }: MapProps) {
     } else {
       console.error("Geolocation is not supported by this browser.");
     }
-  }, [updateUrlParams]);
+  }, []);
 
   useEffect(() => {
     const fetchCategories = async () => {
