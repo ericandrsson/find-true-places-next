@@ -389,7 +389,9 @@ export default function Map({ initialCenter }: MapProps) {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const result = await pb.collection("spot_categories").getFullList<Category>();
+        const result = await pb
+          .collection("spot_categories")
+          .getFullList<Category>();
         setCategories(result);
       } catch (error) {
         console.error("Error fetching categories:", error);
@@ -399,22 +401,26 @@ export default function Map({ initialCenter }: MapProps) {
   }, []);
 
   const getChildCategories = (parentId: string | null) => {
-    return categories.filter(category => category.parent_spot_category === parentId);
+    return categories.filter(
+      (category) => category.parent_spot_category === parentId
+    );
   };
 
   const handleCategorySelect = (categoryId: string, level: number) => {
-    setSelectedCategory(prev => {
+    setSelectedCategory((prev) => {
       const newSelection = [...prev.slice(0, level), categoryId];
       return newSelection.length > 3 ? newSelection.slice(-3) : newSelection;
     });
   };
 
   const renderCategorySelection = () => {
-    const rootCategories = categories.filter(category => !category.parent_spot_category);
-    
+    const rootCategories = categories.filter(
+      (category) => !category.parent_spot_category
+    );
+
     return (
       <div className="space-y-4">
-        <Select 
+        <Select
           onValueChange={(value) => handleCategorySelect(value, 0)}
           value={selectedCategory[0] || ""}
         >
@@ -430,9 +436,9 @@ export default function Map({ initialCenter }: MapProps) {
             ))}
           </SelectContent>
         </Select>
-        
+
         {selectedCategory[0] && (
-          <Select 
+          <Select
             onValueChange={(value) => handleCategorySelect(value, 1)}
             value={selectedCategory[1] || ""}
           >
@@ -449,9 +455,9 @@ export default function Map({ initialCenter }: MapProps) {
             </SelectContent>
           </Select>
         )}
-        
+
         {selectedCategory[1] && (
-          <Select 
+          <Select
             onValueChange={(value) => handleCategorySelect(value, 2)}
             value={selectedCategory[2] || ""}
           >
