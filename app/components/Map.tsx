@@ -29,6 +29,8 @@ import AuthDialog from "./AuthDialog";
 import { haversineDistance } from "@/lib/utils";
 import debounce from "lodash/debounce";
 import { formatDistanceToNow } from "date-fns";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -106,6 +108,7 @@ export default function Map({ initialCenter }: MapProps) {
   } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [spots, setSpots] = useState<Array<any>>([]);
+  const [isPublic, setIsPublic] = useState(true);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -159,6 +162,7 @@ export default function Map({ initialCenter }: MapProps) {
         lng: tagPosition[1],
         category: spotCategory,
         user: pb.authStore.model?.id,
+        isPublic: isPublic,
       };
 
       const newSpot = await pb.collection("spots").create(data);
@@ -166,6 +170,7 @@ export default function Map({ initialCenter }: MapProps) {
       setSpotTitle("");
       setSpotDescription("");
       setSpotCategory("");
+      setIsPublic(true);
 
       // Update the spots state with the new spot
       setSpots((prevSpots) => [...prevSpots, newSpot]);
@@ -317,23 +322,27 @@ export default function Map({ initialCenter }: MapProps) {
             position={[spot.lat, spot.lng]}
             icon={getSpotIcon(spot)}
           >
-            <Popup>
-              <div className="p-2">
-                <h3 className="font-bold text-lg">{spot.name}</h3>
-                <p className="text-sm text-gray-600">{spot.description}</p>
+            <Popup className="custom-popup">
+              <div className="p-4 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg shadow-lg">
+                <h3 className="font-nunito font-extrabold text-2xl text-blue-600 mb-2">{spot.name}</h3>
+                <p className="font-nunito text-sm text-gray-700 mb-3">{spot.description}</p>
                 {spot.category && (
-                  <p className="text-xs text-blue-500 mt-1">
-                    Category:{" "}
-                    <span
-                      style={{ fontSize: "1.2em", verticalAlign: "middle" }}
-                    >
-                      {categories.find((c) => c.id === spot.category)?.icon ||
-                        "📍"}
-                    </span>{" "}
-                    {categories.find((c) => c.id === spot.category)?.name ||
-                      spot.category}
-                  </p>
+                  <div className="flex items-center mb-3">
+                    <span className="text-2xl mr-2">
+                      {categories.find((c) => c.id === spot.category)?.icon || "📍"}
+                    </span>
+                    <span className="font-nunito font-semibold text-sm text-purple-600">
+                      {categories.find((c) => c.id === spot.category)?.name || spot.category}
+                    </span>
+                  </div>
                 )}
+                <div className="flex justify-between items-center text-xs text-gray-500">
+                  <span>Added by: User123</span>
+                  <span>Rating: ⭐⭐⭐⭐☆</span>
+                </div>
+                <button className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-nunito font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105">
+                  More Details
+                </button>
               </div>
             </Popup>
           </Marker>
@@ -444,12 +453,25 @@ export default function Map({ initialCenter }: MapProps) {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="public-switch"
+                checked={isPublic}
+                onCheckedChange={setIsPublic}
+              />
+              <Label htmlFor="public-switch">
+                {isPublic ? "Public" : "Private"}
+              </Label>
+            </div>
             <div className="flex justify-between">
               <Button type="submit">Save Spot</Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowTagForm(false)}
+                onClick={() => {
+                  setShowTagForm(false);
+                  setIsPublic(true);
+                }}
               >
                 Cancel
               </Button>
