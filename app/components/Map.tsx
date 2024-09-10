@@ -31,6 +31,7 @@ import debounce from "lodash/debounce";
 import { formatDistanceToNow } from "date-fns";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Trash2, Edit } from "lucide-react";
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -93,7 +94,7 @@ function TaggingCursor() {
 }
 
 export default function Map({ initialCenter }: MapProps) {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [mode, setMode] = useState<"move" | "pin">("move");
   const [center] = useState(initialCenter);
   const [searchQuery, setSearchQuery] = useState("");
@@ -258,6 +259,28 @@ export default function Map({ initialCenter }: MapProps) {
   // Add a ref for the map
   const mapRef = useRef<L.Map | null>(null);
 
+  const handleSpotUpdate = async (spotId: string, isPublic: boolean) => {
+    try {
+      await pb.collection("spots").update(spotId, { isPublic });
+      // Update the local state to reflect the change
+      setSpots(spots.map(spot => 
+        spot.id === spotId ? { ...spot, isPublic } : spot
+      ));
+    } catch (error) {
+      console.error("Failed to update spot:", error);
+    }
+  };
+
+  const handleSpotDelete = async (spotId: string) => {
+    try {
+      await pb.collection("spots").delete(spotId);
+      // Remove the deleted spot from the local state
+      setSpots(spots.filter(spot => spot.id !== spotId));
+    } catch (error) {
+      console.error("Failed to delete spot:", error);
+    }
+  };
+
   return (
     <div className="relative h-full w-full">
       <style jsx global>{`
@@ -323,7 +346,7 @@ export default function Map({ initialCenter }: MapProps) {
             icon={getSpotIcon(spot)}
           >
             <Popup className="custom-popup">
-              <div className="p-4 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg shadow-lg">
+              <div className="p-4 bg-white rounded-lg shadow-lg w-80">
                 <h3 className="font-nunito font-extrabold text-2xl text-blue-600 mb-2">{spot.name}</h3>
                 <p className="font-nunito text-sm text-gray-700 mb-3">{spot.description}</p>
                 {spot.category && (
@@ -336,13 +359,45 @@ export default function Map({ initialCenter }: MapProps) {
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between items-center text-xs text-gray-500">
-                  <span>Added by: User123</span>
+                <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
+                  <span>Added by: {spot.user === user?.id ? 'You' : 'Another user'}</span>
                   <span>Rating: ⭐⭐⭐⭐☆</span>
                 </div>
-                <button className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-nunito font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105">
-                  More Details
-                </button>
+                {user && (user.id === spot.user) && (
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Switch
+                      id={`public-switch-${spot.id}`}
+                      checked={spot.isPublic}
+                      onCheckedChange={(checked) => handleSpotUpdate(spot.id, checked)}
+                    />
+                    <Label htmlFor={`public-switch-${spot.id}`}>
+                      {spot.isPublic ? "Public" : "Private"}
+                    </Label>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <Button className="bg-blue-500 hover:bg-blue-600 text-white font-nunito font-bold py-2 px-4 rounded-full transition duration-300 ease-in-out transform hover:scale-105">
+                    More Details
+                  </Button>
+                  {user && (user.id === spot.user) && (
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {/* Implement edit functionality */}}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => handleSpotDelete(spot.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </Popup>
           </Marker>
