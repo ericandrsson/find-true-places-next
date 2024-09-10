@@ -21,7 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createSpot, pb } from "@/lib/db";
+import { pb } from "@/lib/db";
+import { useAuth } from "@/app/contexts/AuthContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import AuthDialog from './AuthDialog';
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -65,11 +72,7 @@ function ZoomButtons() {
 }
 
 function TaggingCursor() {
-  const map = useMapEvents({
-    click(e: L.LeafletMouseEvent) {
-      // This will be handled in the main component
-    },
-  });
+  const map = useMapEvents({});
 
   useEffect(() => {
     map.getContainer().style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 100 100"><text y=".9em" font-size="90">📍</text></svg>') 16 16, auto`;
@@ -82,8 +85,9 @@ function TaggingCursor() {
 }
 
 export default function Map({ initialCenter }: MapProps) {
+  const { isAuthenticated } = useAuth();
   const [mode, setMode] = useState<"move" | "pin">("move");
-  const [center, setCenter] = useState(initialCenter);
+  const [center] = useState(initialCenter);
   const [searchQuery, setSearchQuery] = useState("");
   const [showTagForm, setShowTagForm] = useState(false);
   const [tagPosition, setTagPosition] = useState<[number, number] | null>(null);
@@ -99,29 +103,12 @@ export default function Map({ initialCenter }: MapProps) {
   >([]);
 
   useEffect(() => {
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: "/images/marker-icon-2x.png",
-      iconUrl: "/images/marker-icon.png",
-      shadowUrl: "/images/marker-shadow.png",
-    });
-  }, []);
-
-  useEffect(() => {
     const fetchCategories = async () => {
       try {
         const records = await pb.collection("categories").getFullList({
           sort: "name",
         });
-        console.log("Fetched records:", records);
         setCategories(
-          records.map((record) => ({
-            id: record.id,
-            name: record.name,
-          }))
-        );
-        console.log(
-          "Updated categories state:",
           records.map((record) => ({
             id: record.id,
             name: record.name,
@@ -168,22 +155,18 @@ export default function Map({ initialCenter }: MapProps) {
         user: pb.authStore.model?.id,
       };
 
-      const newSpot = await pb.collection("spots").create(data);
-      console.log("New spot created:", newSpot);
+      await pb.collection("spots").create(data);
       setShowTagForm(false);
       setSpotTitle("");
       setSpotDescription("");
       setSpotCategory("");
     } catch (error) {
       console.error("Failed to create spot:", error);
-      // Handle error (e.g., show error message to user)
     }
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically call a geocoding API to convert the search query to coordinates
-    // For this example, we'll just log the search query
     console.log("Searching for:", searchQuery);
   };
 
@@ -232,14 +215,29 @@ export default function Map({ initialCenter }: MapProps) {
         >
           ✋
         </button>
-        <button
-          onClick={() => handleModeChange("pin")}
-          className={`${
-            mode === "pin" ? "bg-blue-500 text-white" : "bg-white text-gray-700"
-          } border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200`}
-        >
-          📍
-        </button>
+        {isAuthenticated ? (
+          <button
+            onClick={() => handleModeChange("pin")}
+            className={`${
+              mode === "pin" ? "bg-blue-500 text-white" : "bg-white text-gray-700"
+            } border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200`}
+          >
+            📍
+          </button>
+        ) : (
+          <Dialog>
+            <DialogTrigger asChild>
+              <button
+                className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
+              >
+                📍
+              </button>
+            </DialogTrigger>
+            <DialogContent>
+              <AuthDialog onClose={() => {}} />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {showTagForm && clickPosition && (
@@ -305,7 +303,6 @@ function MapEvents({ onClick }: { onClick: (e: L.LeafletMouseEvent) => void }) {
   return null;
 }
 
-// Add this new component to control map interactions
 function MapInteractionController({ mode }: { mode: "move" | "pin" }) {
   const map = useMap();
 
