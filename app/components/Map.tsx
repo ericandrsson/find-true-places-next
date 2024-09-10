@@ -71,6 +71,11 @@ interface Spot {
   user: string;
   isPublic: boolean;
   created: string;
+  expand?: {
+    "spot_tags(spot_id)": Array<{
+      tag_id: string;
+    }>;
+  };
 }
 
 interface DynamicMarkersProps {
@@ -85,20 +90,14 @@ interface DynamicMarkersProps {
 interface Tag {
   id: string;
   name: string;
+  icon: string;
 }
 
-const mockTags: Tag[] = [
-  { id: "1", name: "Scenic" },
-  { id: "2", name: "Historical" },
-  { id: "3", name: "Food" },
-  { id: "4", name: "Adventure" },
-  { id: "5", name: "Relaxation" },
-  { id: "6", name: "Family-friendly" },
-  { id: "7", name: "Hidden Gem" },
-  { id: "8", name: "Nightlife" },
-  { id: "9", name: "Cultural" },
-  { id: "10", name: "Nature" },
-];
+interface CategoryTag {
+  id: string;
+  spot_category_id: string;
+  spot_tag_id: string;
+}
 
 function SetViewOnClick({ center }: { center: { lat: number; lng: number } }) {
   const map = useMap();
@@ -322,6 +321,9 @@ export default function Map({ initialCenter }: MapProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showAllTags, setShowAllTags] = useState(false);
   const [modalPosition, setModalPosition] = useState<'top' | 'bottom'>('bottom');
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [categoryTags, setCategoryTags] = useState<CategoryTag[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
 
   useEffect(() => {
     const lat = searchParams.get("lat");
@@ -350,6 +352,7 @@ export default function Map({ initialCenter }: MapProps) {
         const result = await pb.collection("spots").getList<Spot>(1, 1000, {
           filter: filter,
           sort: "-created",
+          expand: "spot_tags(spot_id).tag_id",
         });
 
         const filteredSpots = result.items.filter((spot: any) => {
@@ -430,6 +433,33 @@ export default function Map({ initialCenter }: MapProps) {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const tagsResult = await pb.collection("spot_tags").getFullList<Tag>();
+        setTags(tagsResult);
+
+        const categoryTagsResult = await pb.collection("spot_category_tags").getFullList<CategoryTag>();
+        setCategoryTags(categoryTagsResult);
+      } catch (error) {
+        console.error("Error fetching tags:", error);
+      }
+    };
+    fetchTags();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCategory.length > 0) {
+      const lastSelectedCategoryId = selectedCategory[selectedCategory.length - 1];
+      const relevantCategoryTags = categoryTags.filter(ct => ct.spot_category_id === lastSelectedCategoryId);
+      const relevantTagIds = relevantCategoryTags.map(ct => ct.spot_tag_id);
+      const filteredTags = tags.filter(tag => relevantTagIds.includes(tag.id));
+      setAvailableTags(filteredTags);
+    } else {
+      setAvailableTags([]);
+    }
+  }, [selectedCategory, categoryTags, tags]);
+
   const getChildCategories = (parentId: string | null) => {
     return categories.filter(
       (category) => category.parent_spot_category === parentId
@@ -490,7 +520,11 @@ export default function Map({ initialCenter }: MapProps) {
   };
 
   const renderTagSelection = () => {
-    const visibleTags = showAllTags ? mockTags : mockTags.slice(0, 2);
+    if (availableTags.length === 0) {
+      return null;
+    }
+
+    const visibleTags = showAllTags ? availableTags : availableTags.slice(0, 2);
 
     return (
       <div className="space-y-2">
@@ -508,10 +542,11 @@ export default function Map({ initialCenter }: MapProps) {
                 );
               }}
             >
+              {tag.icon && <span className="mr-1">{tag.icon}</span>}
               {tag.name}
             </Button>
           ))}
-          {mockTags.length > 2 && (
+          {availableTags.length > 2 && (
             <Button
               variant="ghost"
               size="sm"
@@ -535,7 +570,7 @@ export default function Map({ initialCenter }: MapProps) {
             <CommandList className="max-h-32 overflow-y-auto">
               <CommandEmpty>No tags found.</CommandEmpty>
               <CommandGroup>
-                {mockTags.map((tag) => (
+                {availableTags.map((tag) => (
                   <CommandItem
                     key={tag.id}
                     onSelect={() => {
@@ -552,6 +587,7 @@ export default function Map({ initialCenter }: MapProps) {
                         selectedTags.includes(tag.id) ? "opacity-100" : "opacity-0"
                       )}
                     />
+                    {tag.icon && <span className="mr-1">{tag.icon}</span>}
                     {tag.name}
                   </CommandItem>
                 ))}
@@ -602,13 +638,21 @@ export default function Map({ initialCenter }: MapProps) {
         description: spotDescription,
         lat: tagPosition[0],
         lng: tagPosition[1],
-        category: selectedCategory[selectedCategory.length - 1], // Use the last selected category
+        category: selectedCategory[selectedCategory.length - 1],
         user: user?.id,
         isPublic: isPublic,
-        tags: selectedTags, // Add the selected tags
       };
 
       const createdSpot = await pb.collection("spots").create(spotData);
+
+      // Create spot-tag relationships
+      for (const tagId of selectedTags) {
+        await pb.collection("spot_tags").create({
+          spot_id: createdSpot.id,
+          tag_id: tagId,
+        });
+      }
+
       setSpots((prevSpots) => [...prevSpots, createdSpot]);
       setShowTagForm(false);
       setSpotTitle("");
@@ -903,11 +947,12 @@ export default function Map({ initialCenter }: MapProps) {
               <Label>Category</Label>
               {renderCategorySelection()}
             </div>
-            {/* Tag Selection */}
-            <div className="space-y-2">
-              <Label>Tags</Label>
-              {renderTagSelection()}
-            </div>
+            {availableTags.length > 0 && (
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                {renderTagSelection()}
+              </div>
+            )}
             <div className="flex items-center space-x-2">
               <Switch
                 id="public-switch"
