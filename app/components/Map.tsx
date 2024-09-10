@@ -34,6 +34,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Trash2, Edit, ChevronRight, ChevronLeft, List } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import MarkerClusterGroup from 'react-leaflet-cluster';
+import 'react-leaflet-cluster/lib/assets/MarkerCluster.css';
+import 'react-leaflet-cluster/lib/assets/MarkerCluster.Default.css';
 
 const MIN_ZOOM = 6; // 1 is most zoomed in (street level)
 const MAX_ZOOM = 18; // 10 is most zoomed out (world level)
@@ -185,7 +188,20 @@ function DynamicMarkers({
   );
 
   return (
-    <>
+    <MarkerClusterGroup
+      chunkedLoading
+      spiderfyOnMaxZoom={true}
+      showCoverageOnHover={false}
+      maxClusterRadius={50}
+      iconCreateFunction={(cluster) => {
+        const count = cluster.getChildCount();
+        return L.divIcon({
+          html: `<div class="cluster-icon">${count}</div>`,
+          className: 'custom-cluster-icon',
+          iconSize: L.point(40, 40),
+        });
+      }}
+    >
       {spots.map((spot: Spot) => (
         <Marker
           key={spot.id}
@@ -248,7 +264,7 @@ function DynamicMarkers({
           </Popup>
         </Marker>
       ))}
-    </>
+    </MarkerClusterGroup>
   );
 }
 
@@ -586,6 +602,26 @@ export default function Map({ initialCenter }: MapProps) {
           height: 100% !important;
           width: 100% !important;
           position: absolute !important;
+        }
+
+        .custom-cluster-icon {
+          background-color: #3b82f6;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: bold;
+          font-size: 14px;
+          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+        }
+
+        .cluster-icon {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
       `}</style>
 
