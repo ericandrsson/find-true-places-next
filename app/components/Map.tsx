@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createSpot, getCategories } from "@/lib/db";
+import { createSpot, pb } from "@/lib/db";
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -89,7 +89,7 @@ export default function Map({ initialCenter }: MapProps) {
   const [tagPosition, setTagPosition] = useState<[number, number] | null>(null);
   const [spotTitle, setSpotTitle] = useState("");
   const [spotDescription, setSpotDescription] = useState("");
-  const [spotCategory, setSpotCategory] = useState("");
+  const [spotCategory, setSpotCategory] = useState<string>("");
   const [clickPosition, setClickPosition] = useState<{
     x: number;
     y: number;
@@ -108,15 +108,30 @@ export default function Map({ initialCenter }: MapProps) {
   }, []);
 
   useEffect(() => {
-    async function fetchCategories() {
+    const fetchCategories = async () => {
       try {
-        const fetchedCategories = await getCategories();
-
-        setCategories(fetchedCategories);
+        const records = await pb.collection("categories").getFullList({
+          sort: "name",
+        });
+        console.log("Fetched records:", records);
+        setCategories(
+          records.map((record) => ({
+            id: record.id,
+            name: record.name,
+          }))
+        );
+        console.log(
+          "Updated categories state:",
+          records.map((record) => ({
+            id: record.id,
+            name: record.name,
+          }))
+        );
       } catch (error) {
-        console.error("Failed to fetch categories:", error);
+        console.error("Error fetching categories:", error);
       }
-    }
+    };
+
     fetchCategories();
   }, []);
 
@@ -144,13 +159,16 @@ export default function Map({ initialCenter }: MapProps) {
     if (!tagPosition) return;
 
     try {
-      const newSpot = await createSpot({
+      const data = {
         name: spotTitle,
         description: spotDescription,
         lat: tagPosition[0],
         lng: tagPosition[1],
         category: spotCategory,
-      });
+        user: pb.authStore.model?.id,
+      };
+
+      const newSpot = await pb.collection("spots").create(data);
       console.log("New spot created:", newSpot);
       setShowTagForm(false);
       setSpotTitle("");
@@ -170,13 +188,11 @@ export default function Map({ initialCenter }: MapProps) {
   };
 
   return (
-    <div className="relative h-full w-full z-[1000]">
+    <div className="relative h-full w-full">
       <MapContainer
-        className="h-full w-full"
+        className="h-full w-full z-0"
         center={[center.lat, center.lng]}
         zoom={13}
-        // Remove individual interaction props and use a single prop
-        // @ts-ignore
         zoomControl={false}
       >
         <TileLayer
@@ -189,7 +205,8 @@ export default function Map({ initialCenter }: MapProps) {
         <MapEvents onClick={handleMapClick} />
         <MapInteractionController mode={mode} />
       </MapContainer>
-      <div className="absolute top-4 left-4 z-[1001] w-64">
+
+      <div className="absolute top-4 left-4 z-10 w-64">
         <form onSubmit={handleSearch} className="flex flex-col gap-2">
           <Input
             type="text"
@@ -203,7 +220,8 @@ export default function Map({ initialCenter }: MapProps) {
           </Button>
         </form>
       </div>
-      <div className="absolute top-4 right-4 z-[1001] flex flex-col space-y-3">
+
+      <div className="absolute top-4 right-4 z-10 flex flex-col space-y-3">
         <button
           onClick={() => handleModeChange("move")}
           className={`${
@@ -227,7 +245,7 @@ export default function Map({ initialCenter }: MapProps) {
       {showTagForm && clickPosition && (
         <div
           className={cn(
-            "absolute bg-white p-4 rounded-lg shadow-lg z-[1002] w-80",
+            "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-80",
             "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2",
             "before:border-8 before:border-transparent before:border-t-white"
           )}
@@ -251,11 +269,11 @@ export default function Map({ initialCenter }: MapProps) {
               onChange={(e) => setSpotDescription(e.target.value)}
               required
             />
-            <Select onValueChange={setSpotCategory} required>
-              <SelectTrigger>
+            <Select onValueChange={setSpotCategory} value={spotCategory}>
+              <SelectTrigger className="z-30">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-30">
                 {categories.map((category) => (
                   <SelectItem key={category.id} value={category.id}>
                     {category.name}
