@@ -1,0 +1,313 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import L from "leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  useMap,
+  Marker,
+  useMapEvents,
+} from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { createSpot, getCategories } from "@/lib/db";
+
+interface MapProps {
+  initialCenter: { lat: number; lng: number };
+}
+
+function SetViewOnClick({ center }: { center: { lat: number; lng: number } }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([center.lat, center.lng], 13);
+  }, [map, center]);
+  return null;
+}
+
+function ZoomButtons() {
+  const map = useMapEvents({});
+
+  const handleZoom = useCallback(
+    (delta: number) => {
+      const currentZoom = map.getZoom();
+      map.setZoom(currentZoom + delta);
+    },
+    [map]
+  );
+
+  return (
+    <div className="absolute bottom-4 right-4 z-[1001] flex flex-col space-y-2">
+      <button
+        onClick={() => handleZoom(1)}
+        className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-16 h-16 flex items-center justify-center text-xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
+      >
+        +
+      </button>
+      <button
+        onClick={() => handleZoom(-1)}
+        className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-16 h-16 flex items-center justify-center text-xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
+      >
+        -
+      </button>
+    </div>
+  );
+}
+
+function TaggingCursor() {
+  const map = useMapEvents({
+    click(e: L.LeafletMouseEvent) {
+      // This will be handled in the main component
+    },
+  });
+
+  useEffect(() => {
+    map.getContainer().style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 100 100"><text y=".9em" font-size="90">📍</text></svg>') 16 16, auto`;
+    return () => {
+      map.getContainer().style.cursor = "";
+    };
+  }, [map]);
+
+  return null;
+}
+
+export default function Map({ initialCenter }: MapProps) {
+  const [mode, setMode] = useState<"move" | "pin">("move");
+  const [center, setCenter] = useState(initialCenter);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showTagForm, setShowTagForm] = useState(false);
+  const [tagPosition, setTagPosition] = useState<[number, number] | null>(null);
+  const [spotTitle, setSpotTitle] = useState("");
+  const [spotDescription, setSpotDescription] = useState("");
+  const [spotCategory, setSpotCategory] = useState("");
+  const [clickPosition, setClickPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+
+  useEffect(() => {
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: "/images/marker-icon-2x.png",
+      iconUrl: "/images/marker-icon.png",
+      shadowUrl: "/images/marker-shadow.png",
+    });
+  }, []);
+
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const fetchedCategories = await getCategories();
+
+        setCategories(fetchedCategories);
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+      }
+    }
+    fetchCategories();
+  }, []);
+
+  const handleModeChange = (newMode: "move" | "pin") => {
+    setMode(newMode);
+    setShowTagForm(false);
+  };
+
+  const handleMapClick = useCallback(
+    (e: L.LeafletMouseEvent) => {
+      if (mode === "pin") {
+        setTagPosition([e.latlng.lat, e.latlng.lng]);
+        setClickPosition({
+          x: e.originalEvent.clientX,
+          y: e.originalEvent.clientY,
+        });
+        setShowTagForm(true);
+      }
+    },
+    [mode]
+  );
+
+  const handleSpotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tagPosition) return;
+
+    try {
+      const newSpot = await createSpot({
+        name: spotTitle,
+        description: spotDescription,
+        lat: tagPosition[0],
+        lng: tagPosition[1],
+        category: spotCategory,
+      });
+      console.log("New spot created:", newSpot);
+      setShowTagForm(false);
+      setSpotTitle("");
+      setSpotDescription("");
+      setSpotCategory("");
+    } catch (error) {
+      console.error("Failed to create spot:", error);
+      // Handle error (e.g., show error message to user)
+    }
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Here you would typically call a geocoding API to convert the search query to coordinates
+    // For this example, we'll just log the search query
+    console.log("Searching for:", searchQuery);
+  };
+
+  return (
+    <div className="relative h-full w-full z-[1000]">
+      <MapContainer
+        className="h-full w-full"
+        center={[center.lat, center.lng]}
+        zoom={13}
+        // Remove individual interaction props and use a single prop
+        // @ts-ignore
+        zoomControl={false}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <Marker position={[center.lat, center.lng]} />
+        {mode === "move" && <ZoomButtons />}
+        {mode === "pin" && <TaggingCursor />}
+        <MapEvents onClick={handleMapClick} />
+        <MapInteractionController mode={mode} />
+      </MapContainer>
+      <div className="absolute top-4 left-4 z-[1001] w-64">
+        <form onSubmit={handleSearch} className="flex flex-col gap-2">
+          <Input
+            type="text"
+            placeholder="Search for a location"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-white"
+          />
+          <Button type="submit" className="w-full">
+            Search
+          </Button>
+        </form>
+      </div>
+      <div className="absolute top-4 right-4 z-[1001] flex flex-col space-y-3">
+        <button
+          onClick={() => handleModeChange("move")}
+          className={`${
+            mode === "move"
+              ? "bg-blue-500 text-white"
+              : "bg-white text-gray-700"
+          } border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200`}
+        >
+          ✋
+        </button>
+        <button
+          onClick={() => handleModeChange("pin")}
+          className={`${
+            mode === "pin" ? "bg-blue-500 text-white" : "bg-white text-gray-700"
+          } border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200`}
+        >
+          📍
+        </button>
+      </div>
+
+      {showTagForm && clickPosition && (
+        <div
+          className={cn(
+            "absolute bg-white p-4 rounded-lg shadow-lg z-[1002] w-80",
+            "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2",
+            "before:border-8 before:border-transparent before:border-t-white"
+          )}
+          style={{
+            left: `${clickPosition.x}px`,
+            top: `${clickPosition.y - 75}px`,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <form onSubmit={handleSpotSubmit} className="space-y-4">
+            <Input
+              type="text"
+              placeholder="Spot Title"
+              value={spotTitle}
+              onChange={(e) => setSpotTitle(e.target.value)}
+              required
+            />
+            <Textarea
+              placeholder="Spot Description"
+              value={spotDescription}
+              onChange={(e) => setSpotDescription(e.target.value)}
+              required
+            />
+            <Select onValueChange={setSpotCategory} required>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-between">
+              <Button type="submit">Save Spot</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowTagForm(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MapEvents({ onClick }: { onClick: (e: L.LeafletMouseEvent) => void }) {
+  useMapEvents({
+    click: onClick,
+  });
+  return null;
+}
+
+// Add this new component to control map interactions
+function MapInteractionController({ mode }: { mode: "move" | "pin" }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (mode === "move") {
+      map.dragging.enable();
+      map.touchZoom.enable();
+      map.doubleClickZoom.enable();
+      map.scrollWheelZoom.enable();
+      map.boxZoom.enable();
+      map.keyboard.enable();
+    } else {
+      map.dragging.disable();
+      map.touchZoom.disable();
+      map.doubleClickZoom.disable();
+      map.scrollWheelZoom.disable();
+      map.boxZoom.disable();
+      map.keyboard.disable();
+    }
+  }, [map, mode]);
+
+  return null;
+}
