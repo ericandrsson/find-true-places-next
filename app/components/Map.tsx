@@ -456,7 +456,7 @@ export default function Map({ initialCenter }: MapProps) {
           </Select>
         )}
 
-        {selectedCategory[1] && (
+        {selectedCategory[1] && getChildCategories(selectedCategory[1]).length > 0 && (
           <Select
             onValueChange={(value) => handleCategorySelect(value, 2)}
             value={selectedCategory[2] || ""}
