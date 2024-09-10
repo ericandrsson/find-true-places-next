@@ -8,6 +8,7 @@ import {
   useMap,
   Marker,
   useMapEvents,
+  Popup,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { pb } from "@/lib/db";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import AuthDialog from "./AuthDialog";
+import { haversineDistance } from "@/lib/utils";
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -97,6 +99,7 @@ export default function Map({ initialCenter }: MapProps) {
   const [categories, setCategories] = useState<
     Array<{ id: string; name: string }>
   >([]);
+  const [spots, setSpots] = useState<Array<any>>([]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -165,6 +168,58 @@ export default function Map({ initialCenter }: MapProps) {
     e.preventDefault();
     console.log("Searching for:", searchQuery);
   };
+  const fetchSpots = useCallback(async (bounds: L.LatLngBounds) => {
+    try {
+      const center = bounds.getCenter();
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+
+      // Fetch spots within the bounding box
+      const result = await pb.collection("spots").getList(1, 1000, {
+        filter: `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`,
+        sort: "-created",
+      });
+
+      console.log(result);
+
+      // Calculate the visible radius
+      const radius = bounds.getNorthEast().distanceTo(center) / 1000; // Convert to km
+
+      // Filter spots based on the Haversine distance
+      const filteredSpots = result.items.filter((spot) => {
+        const distance = haversineDistance(
+          center.lat,
+          center.lng,
+          spot.lat,
+          spot.lng
+        );
+        return distance <= radius;
+      });
+
+      setSpots(filteredSpots);
+    } catch (error) {
+      console.error("Error fetching spots:", error);
+    }
+  }, []);
+
+  function MapEventHandler() {
+    const map = useMap();
+
+    useEffect(() => {
+      const handleMoveEnd = () => {
+        fetchSpots(map.getBounds());
+      };
+
+      map.on("moveend", handleMoveEnd);
+      handleMoveEnd(); // Fetch spots on initial load
+
+      return () => {
+        map.off("moveend", handleMoveEnd);
+      };
+    }, [map]);
+
+    return null;
+  }
 
   return (
     <div className="relative h-full w-full">
@@ -178,11 +233,19 @@ export default function Map({ initialCenter }: MapProps) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <Marker position={[center.lat, center.lng]} />
+        {spots.map((spot) => (
+          <Marker key={spot.id} position={[spot.lat, spot.lng]}>
+            <Popup>
+              <h3 className="font-bold">{spot.name}</h3>
+              <p>{spot.description}</p>
+            </Popup>
+          </Marker>
+        ))}
         {mode === "move" && <ZoomButtons />}
         {mode === "pin" && <TaggingCursor />}
         <MapEvents onClick={handleMapClick} />
         <MapInteractionController mode={mode} />
+        <MapEventHandler />
       </MapContainer>
 
       <div className="absolute top-4 left-4 z-10 w-64">
