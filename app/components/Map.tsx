@@ -34,9 +34,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Trash2, Edit, ChevronRight, ChevronLeft, List } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import MarkerClusterGroup from 'react-leaflet-cluster';
-import 'react-leaflet-cluster/lib/assets/MarkerCluster.css';
-import 'react-leaflet-cluster/lib/assets/MarkerCluster.Default.css';
+import MarkerClusterGroup from "react-leaflet-cluster";
+import "react-leaflet-cluster/lib/assets/MarkerCluster.css";
+import "react-leaflet-cluster/lib/assets/MarkerCluster.Default.css";
 
 const MIN_ZOOM = 6; // 1 is most zoomed in (street level)
 const MAX_ZOOM = 18; // 10 is most zoomed out (world level)
@@ -197,7 +197,7 @@ function DynamicMarkers({
         const count = cluster.getChildCount();
         return L.divIcon({
           html: `<div class="cluster-icon">${count}</div>`,
-          className: 'custom-cluster-icon',
+          className: "custom-cluster-icon",
           iconSize: L.point(40, 40),
         });
       }}
@@ -512,6 +512,14 @@ export default function Map({ initialCenter }: MapProps) {
     setShowListView(!showListView);
   };
 
+  // Add this new function to handle spot click in the list view
+  const handleSpotClick = useCallback((spot: Spot) => {
+    if (mapRef.current) {
+      mapRef.current.setView([spot.lat, spot.lng], 15);
+    }
+    setShowListView(false);
+  }, []);
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       <style jsx global>{`
@@ -782,6 +790,36 @@ export default function Map({ initialCenter }: MapProps) {
         >
           📍
         </button>
+      </div>
+
+      {/* Add the sidebar */}
+      <div
+        className={`absolute top-0 right-0 h-full w-80 bg-white shadow-lg z-[1002] transition-transform duration-300 ease-in-out ${
+          showListView
+            ? "transform translate-x-0"
+            : "transform translate-x-full"
+        }`}
+      >
+        <div className="p-4">
+          <h2 className="text-2xl font-bold mb-4">Your Spots</h2>
+          <ScrollArea className="h-[calc(100vh-8rem)]">
+            {userSpots.map((spot) => (
+              <div
+                key={spot.id}
+                className="mb-4 p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors duration-200"
+                onClick={() => handleSpotClick(spot)}
+              >
+                <h3 className="font-bold text-lg">{spot.name}</h3>
+                <p className="text-sm text-gray-600">{spot.description}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formatDistanceToNow(new Date(spot.created), {
+                    addSuffix: true,
+                  })}
+                </p>
+              </div>
+            ))}
+          </ScrollArea>
+        </div>
       </div>
     </div>
   );
