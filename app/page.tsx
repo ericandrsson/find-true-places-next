@@ -3,95 +3,34 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useCallback, useRef, useEffect } from "react";
-
-// Update the Modal component
-const Modal = ({ content, position }) => (
-  <div
-    className="absolute bg-white text-black p-4 rounded-lg shadow-lg"
-    style={{
-      top: `${position.y}px`,
-      left: `${position.x}px`,
-      transform: "translate(-50%, -100%)",
-    }}
-  >
-    {content}
-    <div
-      className="absolute w-0 h-0 border-l-8 border-r-8 border-t-8 border-solid border-white border-b-0"
-      style={{
-        bottom: "-8px",
-        left: "50%",
-        transform: "translateX(-50%)",
-      }}
-    />
-  </div>
-);
+import { useRef } from "react";
 
 export default function LandingPage() {
   const router = useRouter();
-  const [modalContent, setModalContent] = useState(null);
-  const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
-  const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef(null);
 
   const handleFindSpots = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          // Redirect to map view with user's location
           router.push(
             `/map?lat=${position.coords.latitude}&lng=${position.coords.longitude}`
           );
         },
         (error) => {
           console.error("Error getting location:", error);
-          // Redirect to map view with default location
           router.push("/map");
         },
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
     } else {
-      // Geolocation not supported, redirect to map view with default location
       router.push("/map");
     }
   };
 
-  const handleMouseEnter = useCallback((content) => {
-    setModalContent(content);
-    setIsHovering(true);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    setIsHovering(false);
-  }, []);
-
-  const handleMouseMove = useCallback(
-    (event) => {
-      if (isHovering && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setModalPosition({
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top,
-        });
-      }
-    },
-    [isHovering]
-  );
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener("mousemove", handleMouseMove);
-      return () => {
-        container.removeEventListener("mousemove", handleMouseMove);
-      };
-    }
-  }, [handleMouseMove]);
-
   return (
     <div className="bg-gray-100" ref={containerRef}>
       <main>
-        {/* Hero Section */}
         <section className="bg-blue-600 text-white py-20">
           <div className="container mx-auto text-center">
             <h2 className="text-4xl font-bold mb-4">
@@ -110,7 +49,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* How It Works */}
         <section className="py-16 bg-gray-100">
           <div className="container mx-auto">
             <h3 className="text-2xl font-bold text-center mb-12">
@@ -122,32 +60,21 @@ export default function LandingPage() {
                   icon: "🔍",
                   title: "Search or Browse",
                   description: "Find places near you or anywhere in the world.",
-                  modalContent:
-                    "Use our interactive map to discover spots in any location!",
                 },
                 {
                   icon: "📖",
                   title: "Read Real Reviews",
                   description:
                     "Get recommendations or avoid spots based on real user feedback.",
-                  modalContent:
-                    "Our reviews are written by real travelers, not paid advertisers.",
                 },
                 {
                   icon: "✍️",
                   title: "Drop Your Own Truth",
                   description:
                     "Contribute by adding your experiences directly on the map.",
-                  modalContent:
-                    "Share your honest opinions to help fellow travelers make informed decisions.",
                 },
               ].map((item, index) => (
-                <div
-                  key={index}
-                  className="w-1/3"
-                  onMouseEnter={() => handleMouseEnter(item.modalContent)}
-                  onMouseLeave={handleMouseLeave}
-                >
+                <div key={index} className="w-1/3">
                   <div className="bg-white rounded-full h-24 w-24 flex items-center justify-center mx-auto mb-4">
                     <span className="text-3xl">{item.icon}</span>
                   </div>
@@ -159,7 +86,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Featured Reviews */}
         <section className="py-16 bg-white">
           <div className="container mx-auto">
             <h3 className="text-2xl font-bold text-center mb-8">
@@ -222,10 +148,6 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-
-      {isHovering && modalContent && (
-        <Modal content={modalContent} position={modalPosition} />
-      )}
     </div>
   );
 }
