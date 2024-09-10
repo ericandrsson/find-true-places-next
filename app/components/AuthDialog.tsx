@@ -29,10 +29,15 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">
-        {isLogin ? "Login" : "Register"}
+    <div className="max-w-md mx-auto bg-white rounded-xl p-6">
+      <h2 className="text-3xl font-bold mb-2 text-center text-primary">
+        Unlock Your Personalized Map! 🗺️
       </h2>
+      <p className="text-sm text-center text-gray-600 mb-6">
+        Join our community to save your favorite spots 📍 discover hidden gems
+        💎, and share your 💡 recommendations 🗣️.
+      </p>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           type="email"
@@ -40,6 +45,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ onClose }) => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          className="w-full"
         />
         <Input
           type="password"
@@ -47,11 +53,22 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ onClose }) => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+          className="w-full"
         />
-        <Button type="submit" className="w-full">
-          {isLogin ? "Login" : "Register"}
+        <Button
+          type="submit"
+          className="w-full bg-primary text-white hover:bg-primary-dark"
+        >
+          {isLogin ? "Login" : "Sign Up Now to Start Pinning"}
         </Button>
       </form>
+
+      <div className="mt-4 flex items-center justify-between">
+        <hr className="w-full" />
+        <span className="px-2 text-gray-500">or</span>
+        <hr className="w-full" />
+      </div>
+
       <Button
         variant="link"
         onClick={() => setIsLogin(!isLogin)}
@@ -61,6 +78,10 @@ const AuthDialog: React.FC<AuthDialogProps> = ({ onClose }) => {
           ? "Need an account? Register"
           : "Already have an account? Login"}
       </Button>
+
+      <p className="text-xs text-center text-gray-500 mt-4">
+        No spam, ever. We value your privacy.
+      </p>
     </div>
   );
 };

@@ -23,12 +23,8 @@ import {
 } from "@/components/ui/select";
 import { pb } from "@/lib/db";
 import { useAuth } from "@/app/contexts/AuthContext";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import AuthDialog from './AuthDialog';
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import AuthDialog from "./AuthDialog";
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -219,7 +215,9 @@ export default function Map({ initialCenter }: MapProps) {
           <button
             onClick={() => handleModeChange("pin")}
             className={`${
-              mode === "pin" ? "bg-blue-500 text-white" : "bg-white text-gray-700"
+              mode === "pin"
+                ? "bg-blue-500 text-white"
+                : "bg-white text-gray-700"
             } border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200`}
           >
             📍
@@ -227,9 +225,7 @@ export default function Map({ initialCenter }: MapProps) {
         ) : (
           <Dialog>
             <DialogTrigger asChild>
-              <button
-                className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
-              >
+              <button className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200">
                 📍
               </button>
             </DialogTrigger>
