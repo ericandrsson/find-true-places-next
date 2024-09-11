@@ -32,15 +32,7 @@ import { haversineDistance } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import {
-  Trash2,
-  Edit,
-  ChevronRight,
-  ChevronLeft,
-  List,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { Trash2, ChevronUp, ChevronDown, List } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import "react-leaflet-cluster/lib/assets/MarkerCluster.css";
@@ -54,16 +46,10 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
-const MIN_ZOOM = 6; // 1 is most zoomed in (street level)
-const MAX_ZOOM = 18; // 10 is most zoomed out (world level)
-const MIN_PIN_ZOOM = 12; // Minimum zoom level required to add pins
+const MIN_ZOOM = 6;
+const MAX_ZOOM = 18;
+const MIN_PIN_ZOOM = 12;
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -221,7 +207,6 @@ function DynamicMarkers({
       const size = Math.round(baseSize * sizeMultiplier);
       const fontSize = Math.max(10, Math.round(14 * sizeMultiplier));
 
-      // Add opacity for private spots
       const opacity = spot.isPublic ? 1 : 0.6;
 
       return L.divIcon({
@@ -358,7 +343,6 @@ export default function Map({ initialCenter }: MapProps) {
   const { user, isAdmin } = useAuth();
   const [mode, setMode] = useState<"move" | "pin">("move");
   const [center, setCenter] = useState(initialCenter);
-  const [searchQuery, setSearchQuery] = useState("");
   const [showTagForm, setShowTagForm] = useState(false);
   const [tagPosition, setTagPosition] = useState<[number, number] | null>(null);
   const [spotTitle, setSpotTitle] = useState("");
@@ -386,7 +370,6 @@ export default function Map({ initialCenter }: MapProps) {
   const [categoryTags, setCategoryTags] = useState<CategoryTag[]>([]);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [currentZoom, setCurrentZoom] = useState(13);
-  const MIN_PIN_ZOOM = 12; // Adjust this value as needed
 
   useEffect(() => {
     const lat = searchParams.get("lat");
@@ -404,7 +387,7 @@ export default function Map({ initialCenter }: MapProps) {
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
         const center = bounds.getCenter();
-        const radius = bounds.getNorthEast().distanceTo(center) / 1000; // km
+        const radius = bounds.getNorthEast().distanceTo(center) / 1000;
 
         let filter = `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`;
 
