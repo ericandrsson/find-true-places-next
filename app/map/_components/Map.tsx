@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/command";
 import { Check } from "lucide-react";
 
-const MIN_ZOOM = 3;
+const MIN_ZOOM = 6;
 const MAX_ZOOM = 18;
 const MIN_PIN_ZOOM = 12;
 
@@ -72,15 +72,8 @@ interface Spot {
   user: string;
   isPublic: boolean;
   created: string;
+  tags: string[]; // New field for tags
   expand?: {
-    "spot_tag_links(spot)"?: Array<{
-      id: string;
-      tag: {
-        id: string;
-        name: string;
-        icon: string;
-      };
-    }>;
     category?: {
       id: string;
       name: string;
@@ -92,6 +85,7 @@ interface Spot {
 interface DynamicMarkersProps {
   spots: Spot[];
   categories: Category[];
+  tags: Tag[]; // Add this line
   handleSpotDelete: (spotId: string) => Promise<void>;
   handleSpotUpdate: (spotId: string, isPublic: boolean) => Promise<void>;
   user: { id: string } | null;
@@ -163,6 +157,7 @@ function TaggingCursor() {
 function DynamicMarkers({
   spots,
   categories,
+  tags, // Add this line
   handleSpotDelete,
   handleSpotUpdate,
   user,
@@ -213,8 +208,8 @@ function DynamicMarkers({
           </div>
         `,
         className: "custom-div-icon",
-        iconSize: [size * 1.5, size * 1.5],
-        iconAnchor: [size * 0.75, size * 1.5],
+        iconSize: L.point(size * 1.5, size * 1.5),
+        iconAnchor: L.point(size * 0.75, size * 1.5),
       });
     },
     [categories, zoom]
@@ -270,30 +265,28 @@ function DynamicMarkers({
               <p className="font-nunito text-sm text-gray-700 mb-3">
                 {spot.description}
               </p>
-              {spot.expand?.["spot_tag_links(spot)"]?.length > 0 && (
+              {spot.tags && spot.tags.length > 0 && (
                 <div className="mb-3">
                   <h4 className="font-nunito font-semibold text-xs text-gray-600 mb-1">
                     Tags:
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {spot.expand["spot_tag_links(spot)"]?.map(
-                      (tagLink: {
-                        id: string;
-                        expand?: { tag?: { name?: string; icon?: string } };
-                      }) => (
-                        <div key={tagLink.id} className="relative group">
+                    {spot.tags.map((tagId) => {
+                      const tag = tags.find((t) => t.id === tagId);
+                      return (
+                        <div key={tagId} className="relative group">
                           <span
                             className="text-lg cursor-help"
-                            title={tagLink.expand?.tag?.name || "Unknown Tag"}
+                            title={tag?.name || "Unknown Tag"}
                           >
-                            {tagLink.expand?.tag?.icon || "🏷️"}
+                            {tag?.icon || "🏷️"}
                           </span>
                           <div className="absolute z-10 bg-black text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                            {tagLink.expand?.tag?.name || "Unknown Tag"}
+                            {tag?.name || "Unknown Tag"}
                           </div>
                         </div>
-                      )
-                    )}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -383,7 +376,7 @@ export default function Map({ initialCenter }: MapProps) {
   }, [searchParams]);
 
   const fetchSpots = useCallback(
-    async (bounds: L.LatLngBounds) => {
+    async (bounds: LatLngBounds) => {
       try {
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
@@ -405,7 +398,7 @@ export default function Map({ initialCenter }: MapProps) {
         const result = await pb.collection("spots").getList<Spot>(1, limit, {
           filter: filter,
           sort: "-created",
-          expand: "spot_tag_links(spot).tag,category",
+          expand: "category", // Remove spot_tag_links expansion
         });
 
         const filteredSpots = result.items.filter((spot: Spot) => {
@@ -428,7 +421,7 @@ export default function Map({ initialCenter }: MapProps) {
 
   const debouncedFetchSpots = useMemo(
     () =>
-      debounce((bounds: L.LatLngBounds) => {
+      debounce((bounds: LatLngBounds) => {
         fetchSpots(bounds);
       }, 300),
     [fetchSpots]
@@ -703,7 +696,7 @@ export default function Map({ initialCenter }: MapProps) {
 
   const handleSpotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tagPosition) return;
+    if (!tagPosition || !user) return;
 
     try {
       const spotCategory = selectedCategory[selectedCategory.length - 1] || "";
@@ -714,24 +707,19 @@ export default function Map({ initialCenter }: MapProps) {
         lat: tagPosition[0],
         lng: tagPosition[1],
         category: spotCategory,
-        user: user?.id,
+        user: user.id, // Make sure we're using the correct user ID
         isPublic: isPublic,
+        tags: selectedTags,
       };
 
       const createdSpot = await pb.collection("spots").create(spotData);
 
-      for (const tagId of selectedTags) {
-        await pb.collection("spot_tag_links").create({
-          spot: createdSpot.id,
-          tag: tagId,
-        });
-      }
-
-      const spotWithTags = await pb.collection("spots").getOne(createdSpot.id, {
-        expand: "spot_tag_links(spot).tag",
+      // Fetch the complete spot data including expansions
+      const fullSpot = await pb.collection("spots").getOne<Spot>(createdSpot.id, {
+        expand: "category",
       });
 
-      setSpots((prevSpots) => [...prevSpots, spotWithTags as Spot]);
+      setSpots((prevSpots) => [...prevSpots, fullSpot]);
       setShowTagForm(false);
       setSpotTitle("");
       setSpotDescription("");
@@ -751,6 +739,7 @@ export default function Map({ initialCenter }: MapProps) {
       setTagPosition(null);
     } catch (error) {
       console.error("Error creating spot:", error);
+      // You might want to show an error message to the user here
     }
   };
 
@@ -936,7 +925,7 @@ export default function Map({ initialCenter }: MapProps) {
       >
         <MapContainer
           className="h-full w-full z-0"
-          center={[center.lat, center.lng]}
+          center={[center.lat, center.lng] as [number, number]}
           zoom={mapZoom}
           zoomControl={false}
           minZoom={MIN_ZOOM}
@@ -959,6 +948,7 @@ export default function Map({ initialCenter }: MapProps) {
           <DynamicMarkers
             spots={spots}
             categories={categories}
+            tags={tags}
             handleSpotDelete={handleSpotDelete}
             handleSpotUpdate={handleSpotUpdate}
             user={user}
