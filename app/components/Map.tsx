@@ -57,6 +57,7 @@ import { Check } from "lucide-react";
 
 const MIN_ZOOM = 6; // 1 is most zoomed in (street level)
 const MAX_ZOOM = 18; // 10 is most zoomed out (world level)
+const MIN_PIN_ZOOM = 12; // Minimum zoom level required to add pins
 
 interface MapProps {
   initialCenter: { lat: number; lng: number };
@@ -214,14 +215,18 @@ function DynamicMarkers({
       const size = Math.round(baseSize * sizeMultiplier);
       const fontSize = Math.max(10, Math.round(14 * sizeMultiplier));
 
+      // Add opacity for private spots
+      const opacity = spot.isPublic ? 1 : 0.6;
+
       return L.divIcon({
         html: `
-          <div class="spot-marker" style="font-size: ${fontSize}px;">
+          <div class="spot-marker" style="font-size: ${fontSize}px; opacity: ${opacity};">
             <span class="spot-icon" style="font-size: ${size}px;">${icon}</span>
             <div class="spot-text">
               <span class="spot-title">${spot.name}</span>
               <span class="spot-time">${timeAgo}</span>
             </div>
+            ${!spot.isPublic ? '<span class="private-indicator">🔒</span>' : ''}
           </div>
         `,
         className: "custom-div-icon",
@@ -238,6 +243,7 @@ function DynamicMarkers({
       spiderfyOnMaxZoom={true}
       showCoverageOnHover={false}
       maxClusterRadius={50}
+      disableClusteringAtZoom={15}
       iconCreateFunction={(cluster: L.MarkerClusterGroup) => {
         const count = cluster.getChildCount();
         return L.divIcon({
@@ -254,7 +260,7 @@ function DynamicMarkers({
           icon={getSpotIcon(spot)}
         >
           <Popup className="custom-popup">
-            <div className="p-4 bg-white rounded-lg w-80">
+            <div className="p-4 bg-white rounded-lg shadow-lg w-80 z-[2000]">
               <div className="flex items-center mb-2">
                 {spot.expand?.category && (
                   <span className="text-2xl mr-2" title={spot.expand.category.name}>
@@ -364,6 +370,8 @@ export default function Map({ initialCenter }: MapProps) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [categoryTags, setCategoryTags] = useState<CategoryTag[]>([]);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [currentZoom, setCurrentZoom] = useState(13);
+  const MIN_PIN_ZOOM = 12; // Adjust this value as needed
 
   useEffect(() => {
     const lat = searchParams.get("lat");
@@ -432,11 +440,15 @@ export default function Map({ initialCenter }: MapProps) {
   function MapEventHandler() {
     const map = useMapEvents({
       moveend: handleMapMove,
-      zoomend: handleMapMove,
+      zoomend: (e) => {
+        handleMapMove();
+        setCurrentZoom(e.target.getZoom());
+      },
     });
 
     useEffect(() => {
       mapRef.current = map;
+      setCurrentZoom(map.getZoom());
     }, [map]);
 
     return null;
@@ -786,6 +798,8 @@ export default function Map({ initialCenter }: MapProps) {
     setShowListView(false);
   }, []);
 
+  const isPinButtonDisabled = currentZoom < MIN_PIN_ZOOM;
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       <style jsx global>{`
@@ -839,13 +853,22 @@ export default function Map({ initialCenter }: MapProps) {
         }
 
         .leaflet-popup-content-wrapper {
-          background: transparent;
-          box-shadow: none;
+          padding: 0;
+          overflow: hidden;
         }
+
         .leaflet-popup-content {
           margin: 0;
           width: auto !important;
         }
+
+        .leaflet-popup-close-button {
+          color: #4B5563;
+          font-size: 20px;
+          padding: 5px;
+          z-index: 2001;
+        }
+
         .leaflet-popup-tip-container {
           display: none;
         }
@@ -879,6 +902,20 @@ export default function Map({ initialCenter }: MapProps) {
           display: flex;
           align-items: center;
           justify-content: center;
+        }
+
+        .private-indicator {
+          position: absolute;
+          top: -5px;
+          right: -5px;
+          font-size: 14px;
+          background-color: rgba(0, 0, 0, 0.5);
+          border-radius: 50%;
+          padding: 2px;
+        }
+
+        .custom-popup {
+          z-index: 2000;
         }
       `}</style>
 
@@ -934,9 +971,12 @@ export default function Map({ initialCenter }: MapProps) {
           <>
             <button
               onClick={() => handleModeChange("pin")}
+              disabled={isPinButtonDisabled}
               className={`${
                 mode === "pin"
                   ? "bg-blue-500 text-white"
+                  : isPinButtonDisabled
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : "bg-white text-gray-700"
               } border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200`}
             >
