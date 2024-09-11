@@ -17,6 +17,7 @@ const geistMono = localFont({
 
 // Add Nunito font
 import { Nunito } from "next/font/google";
+import { Suspense } from "react";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -46,7 +47,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <Header />
-          {children}
+          <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
         </AuthProvider>
       </body>
     </html>

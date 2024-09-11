@@ -46,7 +46,6 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check } from "lucide-react";
-import { Suspense } from "react";
 
 const MIN_ZOOM = 6;
 const MAX_ZOOM = 18;
