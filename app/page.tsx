@@ -38,7 +38,7 @@ export default function LandingPage() {
             </h2>
             <p className="text-xl mb-8">
               Get honest, real-time recommendations from fellow travelers. No
-              ads, no BS—just the truth.
+              ads, no BS&mdash;just the truth.
             </p>
             <Button
               className="bg-white text-blue-600 px-8 py-3 rounded-full text-lg font-semibold hover:bg-blue-100 transition"
@@ -95,8 +95,8 @@ export default function LandingPage() {
               <div className="bg-gray-100 p-6 rounded-lg">
                 <h4 className="font-semibold mb-2">Top Recommended in Paris</h4>
                 <p>
-                  "Hidden gem! Best croissants I've ever had. A must-visit
-                  bakery off the tourist path."
+                  &ldquo;Hidden gem! Best croissants I&apos;ve ever had. A must-visit
+                  bakery off the tourist path.&rdquo;
                 </p>
               </div>
               <div className="bg-gray-100 p-6 rounded-lg">
@@ -104,8 +104,8 @@ export default function LandingPage() {
                   Places to Avoid in New York
                 </h4>
                 <p>
-                  "Tourist trap alert! Overpriced and underwhelming. Skip this
-                  and try the local deli next door instead."
+                  &ldquo;Tourist trap alert! Overpriced and underwhelming. Skip this
+                  and try the local deli next door instead.&rdquo;
                 </p>
               </div>
             </div>

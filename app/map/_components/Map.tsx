@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   MapContainer,
   TileLayer,
@@ -108,14 +108,6 @@ interface CategoryTag {
   id: string;
   spot_category_id: string;
   spot_tag_id: string;
-}
-
-function SetViewOnClick({ center }: { center: { lat: number; lng: number } }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView([center.lat, center.lng], 13);
-  }, [map, center]);
-  return null;
 }
 
 function ZoomButtons({ showListView }: { showListView: boolean }) {
@@ -357,7 +349,6 @@ export default function Map({ initialCenter }: MapProps) {
   const [isPublic, setIsPublic] = useState(true);
   const [showListView, setShowListView] = useState(false);
   const [userSpots, setUserSpots] = useState<Spot[]>([]);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [mapZoom, setMapZoom] = useState(13);
   const mapRef = useRef<L.Map | null>(null);
@@ -678,7 +669,6 @@ export default function Map({ initialCenter }: MapProps) {
       if (mode === "pin") {
         setTagPosition([e.latlng.lat, e.latlng.lng]);
         const clickY = e.originalEvent.clientY;
-        const windowHeight = window.innerHeight;
         const modalHeight = 400; // Approximate height of the modal, adjust as needed
 
         if (clickY < modalHeight) {
@@ -748,11 +738,6 @@ export default function Map({ initialCenter }: MapProps) {
     } catch (error) {
       console.error("Error creating spot:", error);
     }
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Searching for:", searchQuery);
   };
 
   useEffect(() => {
