@@ -46,6 +46,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check } from "lucide-react";
+import { Suspense } from "react";
 
 const MIN_ZOOM = 6;
 const MAX_ZOOM = 18;
@@ -276,19 +277,24 @@ function DynamicMarkers({
                     Tags:
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {spot.expand["spot_tag_links(spot)"].map((tagLink: any) => (
-                      <div key={tagLink.id} className="relative group">
-                        <span
-                          className="text-lg cursor-help"
-                          title={tagLink.expand?.tag?.name || "Unknown Tag"}
-                        >
-                          {tagLink.expand?.tag?.icon || "🏷️"}
-                        </span>
-                        <div className="absolute z-10 bg-black text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                          {tagLink.expand?.tag?.name || "Unknown Tag"}
+                    {spot.expand["spot_tag_links(spot)"]?.map(
+                      (tagLink: {
+                        id: string;
+                        expand?: { tag?: { name?: string; icon?: string } };
+                      }) => (
+                        <div key={tagLink.id} className="relative group">
+                          <span
+                            className="text-lg cursor-help"
+                            title={tagLink.expand?.tag?.name || "Unknown Tag"}
+                          >
+                            {tagLink.expand?.tag?.icon || "🏷️"}
+                          </span>
+                          <div className="absolute z-10 bg-black text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                            {tagLink.expand?.tag?.name || "Unknown Tag"}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 </div>
               )}
@@ -394,7 +400,7 @@ export default function Map({ initialCenter }: MapProps) {
 
         console.log("Fetched spots:", result.items);
 
-        const filteredSpots = result.items.filter((spot: any) => {
+        const filteredSpots = result.items.filter((spot: Spot) => {
           const distance = haversineDistance(
             center.lat,
             center.lng,
