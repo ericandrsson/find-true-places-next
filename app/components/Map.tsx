@@ -80,7 +80,8 @@ interface Spot {
   isPublic: boolean;
   created: string;
   expand?: {
-    "spot_tag_links(spot)": Array<{
+    "spot_tag_links(spot)"?: Array<{
+      id: string;
       tag: {
         id: string;
         name: string;
@@ -248,9 +249,9 @@ function DynamicMarkers({
           icon={getSpotIcon(spot)}
         >
           <Popup className="custom-popup">
-            <div className="p-4 bg-white rounded-lg shadow-lg w-64">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-nunito font-extrabold text-xl text-blue-600">
+            <div className="p-6 bg-white rounded-lg shadow-lg w-80">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="font-nunito font-extrabold text-2xl text-blue-600">
                   {spot.name}
                 </h3>
                 {(isAdmin || user?.id === spot.user) && (
@@ -260,15 +261,15 @@ function DynamicMarkers({
                     onClick={() => handleSpotDelete(spot.id)}
                     className="text-red-500 hover:text-red-700"
                   >
-                    ❌
+                    <Trash2 size={20} />
                   </Button>
                 )}
               </div>
-              <p className="font-nunito text-sm text-gray-700 mb-3">
+              <p className="font-nunito text-sm text-gray-700 mb-4">
                 {spot.description}
               </p>
               {spot.category && (
-                <div className="flex items-center mb-3">
+                <div className="flex items-center mb-4">
                   <span className="text-2xl mr-2">
                     {categories.find((c) => c.id === spot.category)?.icon ||
                       "📍"}
@@ -279,8 +280,35 @@ function DynamicMarkers({
                   </span>
                 </div>
               )}
-              <div className="text-xs text-gray-500 mb-3">
+              {spot.expand?.["spot_tag_links(spot)"]?.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-nunito font-semibold text-sm text-gray-600 mb-2">
+                    Tags:
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {spot.expand["spot_tag_links(spot)"].map((tagLink: any) => (
+                      <div key={tagLink.id} className="relative group">
+                        <span
+                          className="text-2xl cursor-help"
+                          title={tagLink.tag?.name || "Unknown Tag"}
+                        >
+                          {tagLink.tag?.icon || "🏷️"}
+                        </span>
+                        <div className="absolute z-10 bg-black text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                          {tagLink.tag?.name || "Unknown Tag"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="text-xs text-gray-500 mb-4">
                 Added by: {spot.user === user?.id ? "You" : "Another user"}
+              </div>
+              <div className="text-xs text-gray-500 mb-4">
+                {formatDistanceToNow(new Date(spot.created), {
+                  addSuffix: true,
+                })}
               </div>
               {(isAdmin || user?.id === spot.user) && (
                 <div className="flex items-center space-x-2">
@@ -368,6 +396,8 @@ export default function Map({ initialCenter }: MapProps) {
           sort: "-created",
           expand: "spot_tag_links(spot).tag",
         });
+
+        console.log("Fetched spots:", result.items);
 
         const filteredSpots = result.items.filter((spot: any) => {
           const distance = haversineDistance(
@@ -1025,10 +1055,7 @@ export default function Map({ initialCenter }: MapProps) {
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={selectedCategory.length < 2}
-              >
+              <Button type="submit" disabled={selectedCategory.length < 2}>
                 Save Spot
               </Button>
             </div>
