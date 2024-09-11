@@ -254,9 +254,14 @@ function DynamicMarkers({
           icon={getSpotIcon(spot)}
         >
           <Popup className="custom-popup">
-            <div className="p-6 bg-white rounded-lg shadow-lg w-80">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="font-nunito font-extrabold text-2xl text-blue-600">
+            <div className="p-4 bg-white rounded-lg w-80">
+              <div className="flex items-center mb-2">
+                {spot.expand?.category && (
+                  <span className="text-2xl mr-2" title={spot.expand.category.name}>
+                    {spot.expand.category.icon || "📍"}
+                  </span>
+                )}
+                <h3 className="font-nunito font-bold text-xl text-blue-600 flex-grow">
                   {spot.name}
                 </h3>
                 {(isAdmin || user?.id === spot.user) && (
@@ -264,35 +269,25 @@ function DynamicMarkers({
                     variant="ghost"
                     size="sm"
                     onClick={() => handleSpotDelete(spot.id)}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-red-500 hover:text-red-700 ml-2"
                   >
-                    <Trash2 size={20} />
+                    <Trash2 size={16} />
                   </Button>
                 )}
               </div>
-              <p className="font-nunito text-sm text-gray-700 mb-4">
+              <p className="font-nunito text-sm text-gray-700 mb-3">
                 {spot.description}
               </p>
-              {spot.expand?.category && (
-                <div className="flex items-center mb-4">
-                  <span className="text-2xl mr-2">
-                    {spot.expand.category.icon || "📍"}
-                  </span>
-                  <span className="font-nunito font-semibold text-sm text-purple-600">
-                    {spot.expand.category.name}
-                  </span>
-                </div>
-              )}
               {spot.expand?.["spot_tag_links(spot)"]?.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="font-nunito font-semibold text-sm text-gray-600 mb-2">
+                <div className="mb-3">
+                  <h4 className="font-nunito font-semibold text-xs text-gray-600 mb-1">
                     Tags:
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {spot.expand["spot_tag_links(spot)"].map((tagLink: any) => (
                       <div key={tagLink.id} className="relative group">
                         <span
-                          className="text-2xl cursor-help"
+                          className="text-lg cursor-help"
                           title={tagLink.expand?.tag?.name || "Unknown Tag"}
                         >
                           {tagLink.expand?.tag?.icon || "🏷️"}
@@ -305,10 +300,10 @@ function DynamicMarkers({
                   </div>
                 </div>
               )}
-              <div className="text-xs text-gray-500 mb-4">
+              <div className="text-xs text-gray-500 mb-1">
                 Added by: {spot.user === user?.id ? "You" : "Another user"}
               </div>
-              <div className="text-xs text-gray-500 mb-4">
+              <div className="text-xs text-gray-500 mb-3">
                 {formatDistanceToNow(new Date(spot.created), {
                   addSuffix: true,
                 })}
