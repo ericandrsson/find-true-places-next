@@ -925,7 +925,7 @@ export default function Map({ initialCenter }: MapProps) {
       {showTagForm && clickPosition && (
         <div
           className={cn(
-            "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-96",
+            "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-[32rem]",
             modalPosition === 'bottom'
               ? "before:content-[''] before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:border-8 before:border-transparent before:border-b-white"
               : "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-8 before:border-transparent before:border-t-white",
@@ -938,39 +938,53 @@ export default function Map({ initialCenter }: MapProps) {
           }}
         >
           <form onSubmit={handleSpotSubmit} className="space-y-4">
-            <Input
-              type="text"
-              placeholder="Spot Title"
-              value={spotTitle}
-              onChange={(e) => setSpotTitle(e.target.value)}
-              required
-            />
-            <Textarea
-              placeholder="Spot Description"
-              value={spotDescription}
-              onChange={(e) => setSpotDescription(e.target.value)}
-              required
-            />
-            {/* Category Selection */}
-            <div className="space-y-2">
-              <Label>Category</Label>
-              {renderCategorySelection()}
-            </div>
-            {availableTags.length > 0 && (
-              <div className="space-y-2">
-                <Label>Tags</Label>
-                {renderTagSelection()}
+            <div className="flex space-x-4">
+              <div className="flex-1 space-y-4">
+                <div>
+                  <Label htmlFor="spot-title">Title</Label>
+                  <Input
+                    id="spot-title"
+                    type="text"
+                    placeholder="Spot Title"
+                    value={spotTitle}
+                    onChange={(e) => setSpotTitle(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="spot-description">Description</Label>
+                  <Textarea
+                    id="spot-description"
+                    placeholder="Spot Description"
+                    value={spotDescription}
+                    onChange={(e) => setSpotDescription(e.target.value)}
+                    required
+                    className="h-20"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="public-switch"
+                    checked={isPublic}
+                    onCheckedChange={setIsPublic}
+                  />
+                  <Label htmlFor="public-switch">
+                    {isPublic ? "Public" : "Private"}
+                  </Label>
+                </div>
               </div>
-            )}
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="public-switch"
-                checked={isPublic}
-                onCheckedChange={setIsPublic}
-              />
-              <Label htmlFor="public-switch">
-                {isPublic ? "Public" : "Private"}
-              </Label>
+              <div className="flex-1 space-y-4">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  {renderCategorySelection()}
+                </div>
+                {availableTags.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Tags</Label>
+                    {renderTagSelection()}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex justify-between">
               <Button type="submit">Save Spot</Button>
