@@ -447,8 +447,10 @@ export default function Map({ initialCenter }: MapProps) {
     });
 
     useEffect(() => {
-      mapRef.current = map;
-      setCurrentZoom(map.getZoom());
+      if (map) {
+        mapRef.current = map;
+        setCurrentZoom(map.getZoom());
+      }
     }, [map]);
 
     return null;
@@ -703,7 +705,6 @@ export default function Map({ initialCenter }: MapProps) {
     if (!tagPosition) return;
 
     try {
-      // Use the last selected category (subcategory) as the spot's category
       const spotCategory = selectedCategory[selectedCategory.length - 1] || "";
 
       const spotData = {
@@ -711,14 +712,13 @@ export default function Map({ initialCenter }: MapProps) {
         description: spotDescription,
         lat: tagPosition[0],
         lng: tagPosition[1],
-        category: spotCategory, // Store the subcategory here
+        category: spotCategory,
         user: user?.id,
         isPublic: isPublic,
       };
 
       const createdSpot = await pb.collection("spots").create(spotData);
 
-      // Create spot-tag links
       for (const tagId of selectedTags) {
         await pb.collection("spot_tag_links").create({
           spot: createdSpot.id,
@@ -726,7 +726,6 @@ export default function Map({ initialCenter }: MapProps) {
         });
       }
 
-      // Fetch the created spot with expanded tags
       const spotWithTags = await pb.collection("spots").getOne(createdSpot.id, {
         expand: "spot_tag_links(spot).tag",
       });
@@ -738,6 +737,18 @@ export default function Map({ initialCenter }: MapProps) {
       setSelectedCategory([]);
       setSelectedTags([]);
       setIsPublic(true);
+
+      // Switch back to "move" mode
+      setMode("move");
+
+      // Focus on the new spot
+      if (mapRef.current) {
+        mapRef.current.setView([tagPosition[0], tagPosition[1]], 16);
+      }
+
+      // Clear the tag position
+      setTagPosition(null);
+
     } catch (error) {
       console.error("Error creating spot:", error);
     }
@@ -938,6 +949,7 @@ export default function Map({ initialCenter }: MapProps) {
           zoomControl={false}
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
+          ref={mapRef}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
