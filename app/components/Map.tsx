@@ -88,6 +88,11 @@ interface Spot {
         icon: string;
       };
     }>;
+    category?: {
+      id: string;
+      name: string;
+      icon: string;
+    };
   };
 }
 
@@ -268,15 +273,13 @@ function DynamicMarkers({
               <p className="font-nunito text-sm text-gray-700 mb-4">
                 {spot.description}
               </p>
-              {spot.category && (
+              {spot.expand?.category && (
                 <div className="flex items-center mb-4">
                   <span className="text-2xl mr-2">
-                    {categories.find((c) => c.id === spot.category)?.icon ||
-                      "📍"}
+                    {spot.expand.category.icon || "📍"}
                   </span>
                   <span className="font-nunito font-semibold text-sm text-purple-600">
-                    {categories.find((c) => c.id === spot.category)?.name ||
-                      spot.category}
+                    {spot.expand.category.name}
                   </span>
                 </div>
               )}
@@ -290,12 +293,12 @@ function DynamicMarkers({
                       <div key={tagLink.id} className="relative group">
                         <span
                           className="text-2xl cursor-help"
-                          title={tagLink.tag?.name || "Unknown Tag"}
+                          title={tagLink.expand?.tag?.name || "Unknown Tag"}
                         >
-                          {tagLink.tag?.icon || "🏷️"}
+                          {tagLink.expand?.tag?.icon || "🏷️"}
                         </span>
                         <div className="absolute z-10 bg-black text-white text-xs rounded py-1 px-2 bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                          {tagLink.tag?.name || "Unknown Tag"}
+                          {tagLink.expand?.tag?.name || "Unknown Tag"}
                         </div>
                       </div>
                     ))}
@@ -394,7 +397,7 @@ export default function Map({ initialCenter }: MapProps) {
         const result = await pb.collection("spots").getList<Spot>(1, 1000, {
           filter: filter,
           sort: "-created",
-          expand: "spot_tag_links(spot).tag",
+          expand: "spot_tag_links(spot).tag,category",
         });
 
         console.log("Fetched spots:", result.items);
