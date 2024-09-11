@@ -32,7 +32,7 @@ import { haversineDistance } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Trash2, ChevronUp, ChevronDown, List } from "lucide-react";
+import { Trash2, ChevronUp, ChevronDown, List, MapIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import "react-leaflet-cluster/lib/assets/MarkerCluster.css";
@@ -366,6 +366,11 @@ export default function Map({ initialCenter }: MapProps) {
   const [categoryTags, setCategoryTags] = useState<CategoryTag[]>([]);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [currentZoom, setCurrentZoom] = useState(13);
+  const [isDetailed, setIsDetailed] = useState(false);
+
+  const tileLayerUrl = isDetailed
+    ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 
   useEffect(() => {
     const lat = searchParams.get("lat");
@@ -934,7 +939,7 @@ export default function Map({ initialCenter }: MapProps) {
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            url={tileLayerUrl}
           />
           <DynamicMarkers
             spots={spots}
@@ -1103,13 +1108,22 @@ export default function Map({ initialCenter }: MapProps) {
         </div>
       )}
 
-      <div className="absolute bottom-4 left-4 z-[1001]">
+      <div className="absolute bottom-4 left-4 z-[1001] flex space-x-2">
         <button
           onClick={handleSetCurrentLocation}
           className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-16 h-16 flex items-center justify-center text-xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"
         >
           📍
         </button>
+        <Button
+          onClick={() => setIsDetailed(!isDetailed)}
+          variant="outline"
+          size="sm"
+          className="bg-background/80 backdrop-blur-sm h-16 px-4"
+        >
+          <MapIcon className="mr-2 h-4 w-4" />
+          {isDetailed ? 'Simple' : 'Detailed'}
+        </Button>
       </div>
 
       {/* Add the sidebar */}
