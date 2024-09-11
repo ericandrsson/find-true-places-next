@@ -32,7 +32,15 @@ import { haversineDistance } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Trash2, Edit, ChevronRight, ChevronLeft, List, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Trash2,
+  Edit,
+  ChevronRight,
+  ChevronLeft,
+  List,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import "react-leaflet-cluster/lib/assets/MarkerCluster.css";
@@ -44,8 +52,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command"
-import { Check } from "lucide-react"
+} from "@/components/ui/command";
+import { Check } from "lucide-react";
 
 const MIN_ZOOM = 6; // 1 is most zoomed in (street level)
 const MAX_ZOOM = 18; // 10 is most zoomed out (world level)
@@ -324,7 +332,9 @@ export default function Map({ initialCenter }: MapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showAllTags, setShowAllTags] = useState(false);
-  const [modalPosition, setModalPosition] = useState<'top' | 'bottom'>('bottom');
+  const [modalPosition, setModalPosition] = useState<"top" | "bottom">(
+    "bottom"
+  );
   const [tags, setTags] = useState<Tag[]>([]);
   const [categoryTags, setCategoryTags] = useState<CategoryTag[]>([]);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
@@ -443,7 +453,9 @@ export default function Map({ initialCenter }: MapProps) {
         const tagsResult = await pb.collection("spot_tags").getFullList<Tag>();
         setTags(tagsResult);
 
-        const categoryTagsResult = await pb.collection("spot_category_tags").getFullList<CategoryTag>();
+        const categoryTagsResult = await pb
+          .collection("spot_category_tags")
+          .getFullList<CategoryTag>();
         setCategoryTags(categoryTagsResult);
       } catch (error) {
         console.error("Error fetching tags:", error);
@@ -454,10 +466,15 @@ export default function Map({ initialCenter }: MapProps) {
 
   useEffect(() => {
     if (selectedCategory.length > 0) {
-      const lastSelectedCategoryId = selectedCategory[selectedCategory.length - 1];
-      const relevantCategoryTags = categoryTags.filter(ct => ct.spot_category_id === lastSelectedCategoryId);
-      const relevantTagIds = relevantCategoryTags.map(ct => ct.spot_tag_id);
-      const filteredTags = tags.filter(tag => relevantTagIds.includes(tag.id));
+      const lastSelectedCategoryId =
+        selectedCategory[selectedCategory.length - 1];
+      const relevantCategoryTags = categoryTags.filter(
+        (ct) => ct.spot_category_id === lastSelectedCategoryId
+      );
+      const relevantTagIds = relevantCategoryTags.map((ct) => ct.spot_tag_id);
+      const filteredTags = tags.filter((tag) =>
+        relevantTagIds.includes(tag.id)
+      );
       setAvailableTags(filteredTags);
     } else {
       setAvailableTags([]);
@@ -588,7 +605,9 @@ export default function Map({ initialCenter }: MapProps) {
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        selectedTags.includes(tag.id) ? "opacity-100" : "opacity-0"
+                        selectedTags.includes(tag.id)
+                          ? "opacity-100"
+                          : "opacity-0"
                       )}
                     />
                     {tag.icon && <span className="mr-1">{tag.icon}</span>}
@@ -617,9 +636,9 @@ export default function Map({ initialCenter }: MapProps) {
         const modalHeight = 400; // Approximate height of the modal, adjust as needed
 
         if (clickY < modalHeight) {
-          setModalPosition('bottom');
+          setModalPosition("bottom");
         } else {
-          setModalPosition('top');
+          setModalPosition("top");
         }
 
         setClickPosition({
@@ -637,12 +656,15 @@ export default function Map({ initialCenter }: MapProps) {
     if (!tagPosition) return;
 
     try {
+      // Use the last selected category (subcategory) as the spot's category
+      const spotCategory = selectedCategory[selectedCategory.length - 1] || "";
+
       const spotData = {
         name: spotTitle,
         description: spotDescription,
         lat: tagPosition[0],
         lng: tagPosition[1],
-        category: selectedCategory[selectedCategory.length - 1],
+        category: spotCategory, // Store the subcategory here
         user: user?.id,
         isPublic: isPublic,
       };
@@ -659,10 +681,10 @@ export default function Map({ initialCenter }: MapProps) {
 
       // Fetch the created spot with expanded tags
       const spotWithTags = await pb.collection("spots").getOne(createdSpot.id, {
-        expand: 'spot_tag_links(spot).tag',
+        expand: "spot_tag_links(spot).tag",
       });
 
-      setSpots((prevSpots) => [...prevSpots, spotWithTags]);
+      setSpots((prevSpots) => [...prevSpots, spotWithTags as Spot]);
       setShowTagForm(false);
       setSpotTitle("");
       setSpotDescription("");
@@ -926,15 +948,19 @@ export default function Map({ initialCenter }: MapProps) {
         <div
           className={cn(
             "absolute bg-white p-4 rounded-lg shadow-lg z-20 w-[32rem]",
-            modalPosition === 'bottom'
+            modalPosition === "bottom"
               ? "before:content-[''] before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:border-8 before:border-transparent before:border-b-white"
               : "before:content-[''] before:absolute before:top-full before:left-1/2 before:-translate-x-1/2 before:border-8 before:border-transparent before:border-t-white",
             showListView ? "mr-80" : ""
           )}
           style={{
             left: `${clickPosition.x}px`,
-            [modalPosition === 'bottom' ? 'top' : 'bottom']: `${modalPosition === 'bottom' ? clickPosition.y + 10 : window.innerHeight - clickPosition.y + 10}px`,
-            transform: 'translateX(-50%)',
+            [modalPosition === "bottom" ? "top" : "bottom"]: `${
+              modalPosition === "bottom"
+                ? clickPosition.y + 10
+                : window.innerHeight - clickPosition.y + 10
+            }px`,
+            transform: "translateX(-50%)",
           }}
         >
           <form onSubmit={handleSpotSubmit} className="space-y-4">
@@ -987,7 +1013,6 @@ export default function Map({ initialCenter }: MapProps) {
               </div>
             </div>
             <div className="flex justify-between">
-              <Button type="submit">Save Spot</Button>
               <Button
                 type="button"
                 variant="outline"
@@ -999,6 +1024,12 @@ export default function Map({ initialCenter }: MapProps) {
                 }}
               >
                 Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={selectedCategory.length < 2}
+              >
+                Save Spot
               </Button>
             </div>
           </form>
