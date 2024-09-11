@@ -54,6 +54,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const MIN_ZOOM = 6; // 1 is most zoomed in (street level)
 const MAX_ZOOM = 18; // 10 is most zoomed out (world level)
@@ -346,7 +352,7 @@ function DynamicMarkers({
   .leaflet-popup-close-button {
     display: none;
   }
-`}</style>
+`}</style>;
 
 export default function Map({ initialCenter }: MapProps) {
   const { user, isAdmin } = useAuth();
@@ -1033,6 +1039,27 @@ export default function Map({ initialCenter }: MapProps) {
             </DialogContent>
           </Dialog>
         )}
+      </div>
+
+      {/* Add the new dropdown */}
+      <div className="absolute top-4 left-4 z-[1001]">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200">
+              🏷️
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem>All Categories</DropdownMenuItem>
+            {categories.map((category) => (
+              <DropdownMenuItem key={category.id}>
+                <span className="mr-2">{category.icon}</span>
+                {category.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {showTagForm && clickPosition && (
