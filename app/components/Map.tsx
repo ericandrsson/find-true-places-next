@@ -259,7 +259,7 @@ function DynamicMarkers({
           position={[spot.lat, spot.lng]}
           icon={getSpotIcon(spot)}
         >
-          <Popup className="custom-popup">
+          <Popup className="custom-popup" closeButton={false}>
             <div className="p-4 bg-white rounded-lg  w-80 z-[2000]">
               <div className="flex items-center mb-2">
                 {spot.expand?.category && (
@@ -341,6 +341,12 @@ function DynamicMarkers({
     </MarkerClusterGroup>
   );
 }
+
+<style jsx global>{`
+  .leaflet-popup-close-button {
+    display: none;
+  }
+`}</style>
 
 export default function Map({ initialCenter }: MapProps) {
   const { user, isAdmin } = useAuth();
@@ -883,10 +889,7 @@ export default function Map({ initialCenter }: MapProps) {
         }
 
         .leaflet-popup-close-button {
-          color: #4b5563;
-          font-size: 20px;
-          padding: 5px;
-          z-index: 2001;
+          display: none;
         }
 
         .leaflet-popup-tip-container {
