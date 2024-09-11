@@ -397,8 +397,6 @@ export default function Map({ initialCenter }: MapProps) {
           expand: "spot_tag_links(spot).tag,category",
         });
 
-        console.log("Fetched spots:", result.items);
-
         const filteredSpots = result.items.filter((spot: Spot) => {
           const distance = haversineDistance(
             center.lat,
