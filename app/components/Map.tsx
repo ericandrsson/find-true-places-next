@@ -226,7 +226,7 @@ function DynamicMarkers({
               <span class="spot-title">${spot.name}</span>
               <span class="spot-time">${timeAgo}</span>
             </div>
-            ${!spot.isPublic ? '<span class="private-indicator">🔒</span>' : ''}
+            ${!spot.isPublic ? '<span class="private-indicator">🔒</span>' : ""}
           </div>
         `,
         className: "custom-div-icon",
@@ -260,10 +260,13 @@ function DynamicMarkers({
           icon={getSpotIcon(spot)}
         >
           <Popup className="custom-popup">
-            <div className="p-4 bg-white rounded-lg shadow-lg w-80 z-[2000]">
+            <div className="p-4 bg-white rounded-lg  w-80 z-[2000]">
               <div className="flex items-center mb-2">
                 {spot.expand?.category && (
-                  <span className="text-2xl mr-2" title={spot.expand.category.name}>
+                  <span
+                    className="text-2xl mr-2"
+                    title={spot.expand.category.name}
+                  >
                     {spot.expand.category.icon || "📍"}
                   </span>
                 )}
@@ -748,7 +751,6 @@ export default function Map({ initialCenter }: MapProps) {
 
       // Clear the tag position
       setTagPosition(null);
-
     } catch (error) {
       console.error("Error creating spot:", error);
     }
@@ -881,7 +883,7 @@ export default function Map({ initialCenter }: MapProps) {
         }
 
         .leaflet-popup-close-button {
-          color: #4B5563;
+          color: #4b5563;
           font-size: 20px;
           padding: 5px;
           z-index: 2001;
