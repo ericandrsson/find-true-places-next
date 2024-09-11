@@ -27,7 +27,7 @@ import {
 import { pb } from "@/lib/db";
 import { useAuth } from "@/app/contexts/AuthContext";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import AuthDialog from "./AuthDialog";
+import AuthDialog from "../../components/AuthDialog";
 import { haversineDistance } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { Switch } from "@/components/ui/switch";

@@ -16,11 +16,11 @@ const geistMono = localFont({
 });
 
 // Add Nunito font
-import { Nunito } from 'next/font/google';
+import { Nunito } from "next/font/google";
 
 const nunito = Nunito({
-  subsets: ['latin'],
-  variable: '--font-nunito',
+  subsets: ["latin"],
+  variable: "--font-nunito",
 });
 
 export const metadata: Metadata = {
@@ -36,9 +36,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${nunito.variable} font-sans`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${nunito.variable} font-sans`}
+      >
         <AuthProvider>
           <Header />
           {children}

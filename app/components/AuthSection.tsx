@@ -1,14 +1,10 @@
 "use client";
 
-import React from 'react';
-import { useAuth } from '@/app/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import AuthDialog from './AuthDialog';
+import React from "react";
+import { useAuth } from "@/app/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import AuthDialog from "./AuthDialog";
 
 const AuthSection: React.FC = () => {
   const { isAuthenticated, logout, user } = useAuth();
