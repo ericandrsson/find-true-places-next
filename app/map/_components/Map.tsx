@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/command";
 import { Check } from "lucide-react";
 
-const MIN_ZOOM = 6;
+const MIN_ZOOM = 3;
 const MAX_ZOOM = 18;
 const MIN_PIN_ZOOM = 12;
 
@@ -369,8 +369,8 @@ export default function Map({ initialCenter }: MapProps) {
   const [isDetailed, setIsDetailed] = useState(false);
 
   const tileLayerUrl = isDetailed
-    ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+    ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png";
 
   useEffect(() => {
     const lat = searchParams.get("lat");
@@ -390,13 +390,19 @@ export default function Map({ initialCenter }: MapProps) {
         const center = bounds.getCenter();
         const radius = bounds.getNorthEast().distanceTo(center) / 1000;
 
+        // Add this line to get the current zoom level
+        const currentZoom = mapRef.current?.getZoom() || MIN_ZOOM;
+
         let filter = `lat >= ${sw.lat} && lat <= ${ne.lat} && lng >= ${sw.lng} && lng <= ${ne.lng}`;
 
         if (!isAdmin) {
           filter += ` && (isPublic = true || user = "${user?.id}")`;
         }
 
-        const result = await pb.collection("spots").getList<Spot>(1, 1000, {
+        // Add this condition to limit the number of spots when zoomed out
+        const limit = currentZoom < 5 ? 100 : 1000;
+
+        const result = await pb.collection("spots").getList<Spot>(1, limit, {
           filter: filter,
           sort: "-created",
           expand: "spot_tag_links(spot).tag,category",
@@ -936,10 +942,19 @@ export default function Map({ initialCenter }: MapProps) {
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
           ref={mapRef}
+          // Add these options to prevent world repetition
+          worldCopyJump={false}
+          maxBounds={[
+            [-90, -180],
+            [90, 180],
+          ]}
+          maxBoundsViscosity={1.0}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url={tileLayerUrl}
+            // Add this option to prevent loading tiles outside the world bounds
+            noWrap={true}
           />
           <DynamicMarkers
             spots={spots}
@@ -1122,7 +1137,7 @@ export default function Map({ initialCenter }: MapProps) {
           className="bg-background/80 backdrop-blur-sm h-16 px-4"
         >
           <MapIcon className="mr-2 h-4 w-4" />
-          {isDetailed ? 'Simple' : 'Detailed'}
+          {isDetailed ? "Simple" : "Detailed"}
         </Button>
       </div>
 
