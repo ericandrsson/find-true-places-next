@@ -1041,26 +1041,7 @@ export default function Map({ initialCenter }: MapProps) {
         )}
       </div>
 
-      {/* Add the new dropdown */}
-      <div className="absolute top-4 left-4 z-[1001]">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="bg-white text-gray-700 border-2 border-gray-300 rounded-full w-20 h-20 flex items-center justify-center text-3xl shadow-lg hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200">
-              🏷️
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>All Categories</DropdownMenuItem>
-            {categories.map((category) => (
-              <DropdownMenuItem key={category.id}>
-                <span className="mr-2">{category.icon}</span>
-                {category.name}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {/* Dropdown menu hidden for now */}
 
       {showTagForm && clickPosition && (
         <div
