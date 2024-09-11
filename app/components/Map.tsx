@@ -651,8 +651,7 @@ export default function Map({ initialCenter }: MapProps) {
                 {availableTags.map((tag) => (
                   <CommandItem
                     key={tag.id}
-                    onSelect={(e) => {
-                      e.preventDefault();
+                    onSelect={() => {
                       setSelectedTags((prev) =>
                         prev.includes(tag.id)
                           ? prev.filter((id) => id !== tag.id)
