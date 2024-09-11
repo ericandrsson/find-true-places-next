@@ -593,9 +593,11 @@ export default function Map({ initialCenter }: MapProps) {
           {visibleTags.map((tag) => (
             <Button
               key={tag.id}
+              type="button"
               variant={selectedTags.includes(tag.id) ? "default" : "outline"}
               size="sm"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
                 setSelectedTags((prev) =>
                   prev.includes(tag.id)
                     ? prev.filter((id) => id !== tag.id)
@@ -609,9 +611,13 @@ export default function Map({ initialCenter }: MapProps) {
           ))}
           {availableTags.length > 2 && (
             <Button
+              type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setShowAllTags(!showAllTags)}
+              onClick={(e) => {
+                e.preventDefault();
+                setShowAllTags(!showAllTags);
+              }}
             >
               {showAllTags ? (
                 <>
@@ -634,7 +640,8 @@ export default function Map({ initialCenter }: MapProps) {
                 {availableTags.map((tag) => (
                   <CommandItem
                     key={tag.id}
-                    onSelect={() => {
+                    onSelect={(e) => {
+                      e.preventDefault();
                       setSelectedTags((prev) =>
                         prev.includes(tag.id)
                           ? prev.filter((id) => id !== tag.id)
